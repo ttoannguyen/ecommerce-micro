@@ -29,7 +29,7 @@ Luật: phụ thuộc chỉ hướng **vào trong** (adapter -> application -> d
 không biết Spring/JPA/Feign. Luật miền (đủ tồn kho, tính tiền) nằm trong aggregate.
 `product-service` cùng khuôn (đọc catalog + seed dữ liệu qua port).
 
-## Chạy (cần Docker + JDK 17)
+## Chạy (cần Docker + JDK 21)
 
 ```bash
 cd ecommerce-micro
