@@ -57,10 +57,24 @@ Cạm bẫy đã dính và đã sửa: `ProductPersistenceAdapter.save()` ban đ
 mới rồi `merge()` — làm vậy là vứt `@Version` đi, lock mất tác dụng im lặng. Phải sửa trên
 entity **đang được quản lý**.
 
-### 4. Saga thủ công
+### 4. Saga thủ công — và chỗ nó KHÔNG cứu được
 `POST /reservations` đã commit ở productdb. `@Transactional` của order **không** rollback nó
 được. Nên `PlaceOrderService` bắt exception khi lưu đơn thất bại → gọi `DELETE /reservations`
-để trả hàng. Nếu chính việc bồi hoàn cũng fail → log `ERROR` "stock leaked".
+để trả hàng.
+
+**Nhưng bồi hoàn chỉ cứu được lỗi ở bước `save`.** Nếu chính lời gọi `reserve` fail — timeout,
+đứt mạng, lỗi deserialize — thì ta **không biết** product-service đã commit hay chưa:
+
+- Chưa commit → release sẽ **tạo hàng từ không khí**.
+- Đã commit → không release thì **mất hàng vĩnh viễn**.
+
+Không `try/catch` nào phân biệt được. Đây là **ambiguous outcome**, bản chất của distributed
+system. Hiện tại code chỉ `log.error("Reservation outcome UNKNOWN, stock may be leaked")`
+và để người vào dọn.
+
+Đã dính thật: xem mục "Bẫy môi trường" bên dưới — `IllegalAccessError` của Feign proxy làm
+`reserve` ném exception **sau khi** kho đã bị trừ. 2 món của product 3 bay mất vĩnh viễn trong
+productdb. Đó là lý do phải làm **hold có TTL** trước khi làm bất cứ thứ gì khác.
 
 ### 5. `HttpStatus` chỉ sống ở `adapter/in/web`
 `ErrorCode` enum giữ `HttpStatus`, và nó nằm ở tầng web. Domain ném exception; `GlobalExceptionHandler`
@@ -104,3 +118,20 @@ dịch sang mã HTTP. **Application không được biết 400/409 là gì.**
   `spring-boot-starter-test` tách thành `-webmvc-test`, `-data-jpa-test`, `-validation-test`.
 - **springdoc 3.0.3 pin Boot 4.0.5**, mình chạy 4.1.0. Compile pass **không** đủ — `OpenApiDocsTest`
   boot context thật để chứng minh nó chạy. Đừng xoá test đó.
+- **Wire DTO của Feign PHẢI `public`.** `ReservationResponse` / `ReserveStockRequest` từng là
+  record package-private → compile sạch, test xanh, nhưng **chết lúc runtime**:
+  ```
+  java.lang.IllegalAccessError: failed to access class ...ReservationResponse
+  from class jdk.proxy2.$Proxy160
+  ```
+  Feign sinh JDK dynamic proxy, proxy nằm trong module `jdk.proxy2` — khác runtime package —
+  nên không đọc được type package-private. Đừng "dọn dẹp" bỏ `public` đi.
+
+## Lỗ hổng test đã biết
+
+**Không test nào chạm vào Feign client.** Bug `IllegalAccessError` ở trên compile sạch và qua
+hết 19 test — chỉ `docker compose up` mới lộ. `OrderValidationTest` chặn request ở biên nên
+không bao giờ gọi tới adapter.
+
+Cần một test dựng stub HTTP (WireMock / MockWebServer) cho `ProductClientAdapter`, để đường dây
+`ProductClient` → proxy → deserialize được chạy thật trong `mvn test`. Chưa làm.

@@ -1,5 +1,6 @@
 package com.shop.order.application;
 
+import com.shop.order.domain.model.InsufficientStockException;
 import com.shop.order.domain.model.Order;
 import com.shop.order.domain.model.Quantity;
 import com.shop.order.domain.model.ReservedProduct;
@@ -36,7 +37,7 @@ public class PlaceOrderService implements PlaceOrderUseCase {
         Quantity quantity = Quantity.of(command.quantity());
 
         // Step 1: product-service takes the stock, or refuses. No stock, no order.
-        ReservedProduct reserved = reserveStockPort.reserve(command.productId(), quantity);
+        ReservedProduct reserved = reserve(command.productId(), quantity);
 
         // Step 2: record the order. If this fails the stock is already gone, so give it back.
         try {
@@ -44,6 +45,26 @@ public class PlaceOrderService implements PlaceOrderUseCase {
         } catch (RuntimeException saveFailed) {
             compensate(command.productId(), quantity, saveFailed);
             throw saveFailed;
+        }
+    }
+
+    private ReservedProduct reserve(Long productId, Quantity quantity) {
+        try {
+            return reserveStockPort.reserve(productId, quantity);
+        } catch (InsufficientStockException refused) {
+            // A clean "no". product-service decided and committed nothing. Safe to give up.
+            throw refused;
+        } catch (RuntimeException ambiguous) {
+            // Timeout, reset connection, bad deserialisation: the call failed, but we do
+            // NOT know whether product-service committed the decrement before it did. We
+            // cannot compensate — releasing stock that was never taken would invent stock.
+            //
+            // No try/catch can close this. The fix is a reservation with a TTL, so an
+            // unclaimed one expires on its own, or an idempotency key so the call can be
+            // safely retried. Until then, log it and let a human reconcile.
+            log.error("Reservation outcome UNKNOWN, stock may be leaked: productId={} quantity={}",
+                    productId, quantity.value(), ambiguous);
+            throw ambiguous;
         }
     }
 
