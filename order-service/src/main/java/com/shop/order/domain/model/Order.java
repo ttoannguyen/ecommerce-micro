@@ -3,8 +3,13 @@ package com.shop.order.domain.model;
 import java.time.Instant;
 
 /**
- * Aggregate root Order — POJO thuần, KHÔNG annotation framework.
- * Bất biến miền (đủ tồn kho, tính tiền) nằm ở đây, không rò ra ngoài.
+ * Order aggregate root — plain POJO, no framework annotations.
+ *
+ * Note what is NOT here any more: the stock check. Stock belongs to
+ * product-service,
+ * so product-service enforces it. An aggregate may only enforce invariants over
+ * data
+ * it owns; enforcing one over a remote copy is how you oversell.
  */
 public class Order {
 
@@ -16,7 +21,7 @@ public class Order {
     private final Instant createdAt;
 
     private Order(Long id, Long productId, Quantity quantity,
-                  Money totalPrice, OrderStatus status, Instant createdAt) {
+            Money totalPrice, OrderStatus status, Instant createdAt) {
         this.id = id;
         this.productId = productId;
         this.quantity = quantity;
@@ -25,21 +30,16 @@ public class Order {
         this.createdAt = createdAt;
     }
 
-    /** Factory: đặt đơn mới dựa trên ảnh chiếu product. Ép bất biến tồn kho. */
-    public static Order place(ProductSnapshot product, Quantity quantity) {
-        if (!product.hasStockFor(quantity)) {
-            throw new InsufficientStockException(
-                    "Không đủ tồn kho. Còn " + product.stock()
-                            + ", cần " + quantity.value());
-        }
+    /** Places an order against stock that has already been reserved. */
+    public static Order place(ReservedProduct product, Quantity quantity) {
         Money total = product.price().multiply(quantity.value());
         return new Order(null, product.productId(), quantity, total,
                 OrderStatus.CREATED, Instant.now());
     }
 
-    /** Dựng lại aggregate từ tầng persistence (đã có id). */
+    /** Rebuilds the aggregate from persistence (id already assigned). */
     public static Order rehydrate(Long id, Long productId, Quantity quantity,
-                                  Money totalPrice, OrderStatus status, Instant createdAt) {
+            Money totalPrice, OrderStatus status, Instant createdAt) {
         return new Order(id, productId, quantity, totalPrice, status, createdAt);
     }
 

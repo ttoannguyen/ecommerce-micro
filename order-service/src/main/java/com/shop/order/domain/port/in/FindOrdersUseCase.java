@@ -5,7 +5,7 @@ import com.shop.order.domain.model.Order;
 import java.util.List;
 import java.util.Optional;
 
-/** Inbound port: đọc đơn hàng. */
+/** Inbound port: read orders. */
 public interface FindOrdersUseCase {
 
     List<Order> findAll();

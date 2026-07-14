@@ -5,7 +5,7 @@ import com.shop.order.domain.model.Order;
 import java.util.List;
 import java.util.Optional;
 
-/** Outbound port: đọc đơn hàng từ store. */
+/** Outbound port: reads orders from the store. */
 public interface LoadOrderPort {
 
     List<Order> findAll();

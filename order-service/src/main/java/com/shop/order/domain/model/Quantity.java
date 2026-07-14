@@ -1,6 +1,6 @@
 package com.shop.order.domain.model;
 
-/** Value object: số lượng đặt. Luôn > 0. */
+/** Value object: order quantity. Always > 0. */
 public final class Quantity {
 
     private final int value;

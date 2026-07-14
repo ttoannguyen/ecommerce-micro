@@ -9,7 +9,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** Bản ghi JPA cho Order. Tách khỏi aggregate miền (annotation nằm ở đây). */
+/** JPA record for Order. Separate from the domain aggregate — annotations live here. */
 @Entity
 @Table(name = "orders")
 public class OrderJpaEntity {

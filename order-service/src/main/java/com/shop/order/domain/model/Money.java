@@ -2,7 +2,7 @@ package com.shop.order.domain.model;
 
 import java.math.BigDecimal;
 
-/** Value object: tiền. Bất biến, không âm. */
+/** Value object: money. Immutable, never negative. */
 public final class Money {
 
     private final BigDecimal amount;

@@ -13,8 +13,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Nạp context thật (H2 thay Postgres) để chứng minh springdoc chạy được trên
- * Boot 4.1 — compile được không có nghĩa là runtime OK.
+ * Boots the real context (H2 standing in for Postgres) to prove springdoc actually
+ * works on Boot 4.1. Compiling is not the same as running.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

@@ -5,7 +5,7 @@ import com.shop.order.domain.model.Order;
 import com.shop.order.domain.model.OrderStatus;
 import com.shop.order.domain.model.Quantity;
 
-/** Dịch giữa aggregate miền và bản ghi JPA. */
+/** Translates between the domain aggregate and the JPA record. */
 final class OrderMapper {
 
     private OrderMapper() {

@@ -1,6 +1,11 @@
 package com.shop.product.domain.model;
 
-/** Aggregate root Product — POJO thuần, không annotation framework. */
+/**
+ * Product aggregate root — plain POJO, no framework annotations.
+ *
+ * Product owns the stock, so the "never oversell" invariant is enforced HERE.
+ * order-service cannot enforce it: all it ever sees is a copy that is already stale.
+ */
 public class Product {
 
     private final Long id;
@@ -18,14 +23,34 @@ public class Product {
         this.stock = stock;
     }
 
-    /** Tạo product mới (chưa có id). */
+    /** Creates a new product (no id yet). */
     public static Product create(String name, Money price, int stock) {
         return new Product(null, name, price, stock);
     }
 
-    /** Dựng lại từ tầng persistence (đã có id). */
+    /** Rebuilds from persistence (id already assigned). */
     public static Product rehydrate(Long id, String name, Money price, int stock) {
         return new Product(id, name, price, stock);
+    }
+
+    /** Reserve: take the stock off the shelf now. A decision, not a question. */
+    public Product reserve(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("quantity phải > 0");
+        }
+        if (stock < quantity) {
+            throw new InsufficientStockException(
+                    "Không đủ tồn kho. Còn " + stock + ", cần " + quantity);
+        }
+        return new Product(id, name, price, stock - quantity);
+    }
+
+    /** Compensation: put the stock back after the caller failed. */
+    public Product release(int quantity) {
+        if (quantity <= 0) {
+            throw new IllegalArgumentException("quantity phải > 0");
+        }
+        return new Product(id, name, price, stock + quantity);
     }
 
     public Long id() {

@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/** Inbound adapter REST. Chỉ dịch HTTP <-> use case, không có luật miền. */
+/** Inbound REST adapter. Translates HTTP into use cases; holds no domain rules. */
 @RestController
 @RequestMapping("/orders")
 public class OrderController {

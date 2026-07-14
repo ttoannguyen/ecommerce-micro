@@ -3,7 +3,7 @@ package com.shop.order.adapter.in.web.dto;
 import java.time.Instant;
 import java.util.Map;
 
-/** Thân lỗi trả về client. `fields` chỉ có giá trị khi lỗi validate. */
+/** Error body returned to the client. `fields` is only populated for validation errors. */
 public record ErrorResponse(
         String code,
         String message,

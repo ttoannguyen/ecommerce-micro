@@ -1,0 +1,15 @@
+# Run without Postgres:  ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# In-memory H2. Data is gone when the process stops — that is the point of dev.
+spring:
+  datasource:
+    url: jdbc:h2:mem:productdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  h2:
+    console:
+      enabled: true
+      path: /h2-console

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Optional;
 
-/** Outbound adapter: hiện thực port lưu/đọc bằng Spring Data. */
+/** Outbound adapter: implements the load/save ports with Spring Data. */
 @Component
 public class OrderPersistenceAdapter implements SaveOrderPort, LoadOrderPort {
 

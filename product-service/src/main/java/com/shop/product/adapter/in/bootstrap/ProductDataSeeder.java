@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 
-/** Seed vài sản phẩm khi DB trống. Chạy qua port, không đụng repository trực tiếp. */
+/** Seeds a few products when the DB is empty. Goes through the port, never the repository. */
 @Component
 public class ProductDataSeeder implements CommandLineRunner {
 

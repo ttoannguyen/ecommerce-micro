@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Dịch lỗi miền -> mã HTTP. Nơi duy nhất biết HTTP status. */
+/** Translates domain failures into HTTP status codes. The only place that knows HTTP. */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
         return build(ErrorCode.INVALID_REQUEST, ex.getMessage());
     }
 
-    /** @Valid trượt: gom lỗi từng field thay vì ném một chuỗi khó đọc. */
+    /** @Valid failed: collect the per-field errors instead of one unreadable string. */
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fields = new HashMap<>();

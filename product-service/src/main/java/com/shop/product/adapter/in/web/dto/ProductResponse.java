@@ -4,7 +4,7 @@ import com.shop.product.domain.model.Product;
 
 import java.math.BigDecimal;
 
-/** View HTTP của product. */
+/** HTTP view of a product. */
 public record ProductResponse(Long id, String name, BigDecimal price, int stock) {
 
     public static ProductResponse from(Product product) {

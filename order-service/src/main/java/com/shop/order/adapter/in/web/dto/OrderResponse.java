@@ -5,7 +5,7 @@ import com.shop.order.domain.model.Order;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-/** View HTTP của đơn. Tách aggregate khỏi wire format. */
+/** HTTP view of an order. Keeps the aggregate away from the wire format. */
 public record OrderResponse(
         Long id,
         Long productId,

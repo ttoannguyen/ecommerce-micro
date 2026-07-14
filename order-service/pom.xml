@@ -69,10 +69,12 @@
             <artifactId>spring-boot-starter-validation-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- runtime, not test: the `dev` profile runs on H2 so the service starts
+             without Postgres. Production uses `docker compose up`. -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 

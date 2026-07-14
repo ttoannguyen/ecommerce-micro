@@ -5,7 +5,7 @@ import com.shop.product.domain.model.Product;
 import java.util.List;
 import java.util.Optional;
 
-/** Inbound port: đọc catalog. */
+/** Inbound port: read the catalog. */
 public interface FindProductsUseCase {
 
     List<Product> findAll();

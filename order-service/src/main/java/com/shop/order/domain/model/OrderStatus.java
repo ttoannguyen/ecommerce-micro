@@ -1,6 +1,6 @@
 package com.shop.order.domain.model;
 
-/** Trạng thái vòng đời đơn hàng. */
+/** Lifecycle status of an order. */
 public enum OrderStatus {
     CREATED,
     PAID,

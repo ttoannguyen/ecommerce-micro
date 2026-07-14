@@ -3,8 +3,8 @@ package com.shop.order.adapter.in.web;
 import org.springframework.http.HttpStatus;
 
 /**
- * Bảng dịch lỗi -> HTTP. Sống ở adapter/in/web vì HttpStatus là chuyện của
- * transport: domain và application không được biết mã 400/409 là gì.
+ * Maps failures to HTTP. Lives in adapter/in/web because HttpStatus is a transport
+ * concern: neither the domain nor the application layer may know what a 400 is.
  */
 public enum ErrorCode {
 

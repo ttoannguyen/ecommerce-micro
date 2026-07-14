@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
-/** Use case đọc catalog. */
+/** Read-side use case for the catalog. */
 @Service
 @Transactional(readOnly = true)
 public class ProductQueryService implements FindProductsUseCase {

@@ -1,6 +1,6 @@
 package com.shop.order.domain.model;
 
-/** Vi phạm bất biến miền: không đủ tồn kho để đặt. */
+/** product-service refused the reservation: not enough stock. */
 public class InsufficientStockException extends RuntimeException {
 
     public InsufficientStockException(String message) {

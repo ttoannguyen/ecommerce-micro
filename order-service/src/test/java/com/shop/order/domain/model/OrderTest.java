@@ -6,22 +6,22 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Test bất biến của aggregate. Không @SpringBootTest, không DB, không mock —
- * Order là POJO thuần nên chạy trong vài mili giây. Đây là phần thưởng của hexagonal.
+ * Order no longer checks stock, so there is nothing here about stock. It checks the
+ * one thing it actually owns: the arithmetic. Stock invariants moved to
+ * product-service, whose ProductTest covers them.
  */
 class OrderTest {
 
-    private static ProductSnapshot product(int stock, String price) {
-        return new ProductSnapshot(1L, "Bàn phím cơ", Money.of(new BigDecimal(price)), stock);
+    private static ReservedProduct reserved(String price) {
+        return new ReservedProduct(1L, "Mechanical keyboard", Money.of(new BigDecimal(price)));
     }
 
     @Test
-    @DisplayName("đủ tồn kho -> tạo đơn, tổng tiền = đơn giá x số lượng")
-    void placesOrderWhenStockIsEnough() {
-        Order order = Order.place(product(10, "1200000"), Quantity.of(3));
+    @DisplayName("total = unit price x quantity")
+    void computesTotalFromReservedPrice() {
+        Order order = Order.place(reserved("1200000"), Quantity.of(3));
 
         assertThat(order.id()).isNull();
         assertThat(order.productId()).isEqualTo(1L);
@@ -32,26 +32,9 @@ class OrderTest {
     }
 
     @Test
-    @DisplayName("mua đúng bằng tồn kho -> vẫn hợp lệ (biên)")
-    void allowsBuyingExactlyAllStock() {
-        Order order = Order.place(product(5, "1000"), Quantity.of(5));
-
-        assertThat(order.quantity().value()).isEqualTo(5);
-    }
-
-    @Test
-    @DisplayName("thiếu tồn kho -> InsufficientStockException, không tạo đơn")
-    void rejectsOrderWhenStockIsInsufficient() {
-        assertThatThrownBy(() -> Order.place(product(2, "1000"), Quantity.of(3)))
-                .isInstanceOf(InsufficientStockException.class)
-                .hasMessageContaining("Còn 2")
-                .hasMessageContaining("cần 3");
-    }
-
-    @Test
-    @DisplayName("hết hàng -> mọi số lượng đều bị chặn")
-    void rejectsOrderWhenOutOfStock() {
-        assertThatThrownBy(() -> Order.place(product(0, "1000"), Quantity.of(1)))
-                .isInstanceOf(InsufficientStockException.class);
+    @DisplayName("a new order starts as CREATED")
+    void startsInCreatedStatus() {
+        assertThat(Order.place(reserved("1000"), Quantity.of(1)).status())
+                .isEqualTo(OrderStatus.CREATED);
     }
 }

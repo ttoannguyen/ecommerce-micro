@@ -15,8 +15,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Chặn ở biên: request sai không bao giờ chạm tới use case, nên không cần
- * product-service sống. Đó là điểm của validate ở adapter.
+ * Rejected at the boundary: a bad request never reaches the use case, so
+ * product-service need not even be running. That is the point of validating here.
  */
 @SpringBootTest
 @AutoConfigureMockMvc

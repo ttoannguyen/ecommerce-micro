@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 
-/** Use case đọc đơn hàng. */
+/** Read-side use case for orders. */
 @Service
 @Transactional(readOnly = true)
 public class OrderQueryService implements FindOrdersUseCase {
