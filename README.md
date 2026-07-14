@@ -29,6 +29,9 @@ Luật: phụ thuộc chỉ hướng **vào trong** (adapter -> application -> d
 không biết Spring/JPA/Feign. Luật miền (đủ tồn kho, tính tiền) nằm trong aggregate.
 `product-service` cùng khuôn (đọc catalog + seed dữ liệu qua port).
 
+`HttpStatus` chỉ được xuất hiện ở `adapter/in/web` (xem `ErrorCode`). Domain ném
+exception, `GlobalExceptionHandler` dịch sang mã HTTP — application không biết 400/409 là gì.
+
 ## Chạy (cần Docker + JDK 21)
 
 ```bash
@@ -60,11 +63,46 @@ curl http://localhost:8082/orders
 - Khi Product chết -> Order gọi lỗi (tuần 4 sẽ thêm Circuit Breaker)
 
 ## Chạy local (không Docker)
-Cần 2 Postgres chạy sẵn (5432 productdb, 5433 orderdb). Rồi:
+
+Cần JDK 21 + 2 Postgres chạy sẵn (5432 `productdb`, 5433 `orderdb`).
+Không cần cài Maven — `mvnw` tự tải.
+
 ```bash
-cd product-service && ./mvnw spring-boot:run   # port 8081
-cd order-service   && ./mvnw spring-boot:run   # port 8082, DB_PORT=5433
+# Terminal 1
+cd product-service
+./mvnw spring-boot:run          # Windows: .\mvnw.cmd spring-boot:run   -> 8081
+
+# Terminal 2
+cd order-service
+./mvnw spring-boot:run          # Windows: .\mvnw.cmd spring-boot:run   -> 8082
 ```
+
+Lệnh hay dùng khác:
+
+| Lệnh | Làm gì |
+|---|---|
+| `./mvnw test` | Chạy test (domain test không cần DB) |
+| `./mvnw clean package` | Build ra `target/*.jar` |
+| `./mvnw spring-boot:run` | Chạy service |
+| `java -jar target/*.jar` | Chạy jar đã build |
+
+## API docs (Swagger)
+
+Mỗi service tự sinh spec khi chạy:
+
+- http://localhost:8081/swagger-ui.html — product-service
+- http://localhost:8082/swagger-ui.html — order-service
+- `/v3/api-docs` — spec JSON thô
+
+## Test
+
+```bash
+./mvnw test
+```
+- `domain/model/*Test` — POJO thuần, không Spring, không DB. ~0.1s.
+- `adapter/in/web/*Test` — nạp context thật trên H2. ~10-20s.
+
+Chênh lệch 100 lần đó là lý do đẩy luật miền vào `domain/`.
 
 ## Tuần sau
 - Tuần 2: + Eureka + API Gateway (bỏ hard-code URL)

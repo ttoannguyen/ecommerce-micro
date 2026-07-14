@@ -6,6 +6,7 @@ import com.shop.order.domain.model.Order;
 import com.shop.order.domain.port.in.FindOrdersUseCase;
 import com.shop.order.domain.port.in.PlaceOrderCommand;
 import com.shop.order.domain.port.in.PlaceOrderUseCase;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -31,9 +32,9 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<OrderResponse> create(@RequestBody CreateOrderRequest request) {
+    public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
         Order order = placeOrderUseCase.placeOrder(
-                new PlaceOrderCommand(request.getProductId(), request.getQuantity()));
+                new PlaceOrderCommand(request.productId(), request.quantity()));
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }
 

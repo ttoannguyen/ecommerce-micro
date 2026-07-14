@@ -1,24 +1,14 @@
 package com.shop.order.adapter.in.web.dto;
 
-/** Payload HTTP tạo đơn. */
-public class CreateOrderRequest {
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
-    private Long productId;
-    private int quantity;
+/** Payload HTTP tạo đơn. Validate ở biên, trước khi vào use case. */
+public record CreateOrderRequest(
 
-    public Long getProductId() {
-        return productId;
-    }
+        @NotNull(message = "productId là bắt buộc")
+        Long productId,
 
-    public void setProductId(Long productId) {
-        this.productId = productId;
-    }
-
-    public int getQuantity() {
-        return quantity;
-    }
-
-    public void setQuantity(int quantity) {
-        this.quantity = quantity;
-    }
+        @Positive(message = "quantity phải > 0")
+        int quantity) {
 }

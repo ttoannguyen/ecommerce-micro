@@ -1,0 +1,20 @@
+package com.shop.order.adapter.in.web.dto;
+
+import java.time.Instant;
+import java.util.Map;
+
+/** Thân lỗi trả về client. `fields` chỉ có giá trị khi lỗi validate. */
+public record ErrorResponse(
+        String code,
+        String message,
+        Instant timestamp,
+        Map<String, String> fields) {
+
+    public static ErrorResponse of(String code, String message) {
+        return new ErrorResponse(code, message, Instant.now(), Map.of());
+    }
+
+    public static ErrorResponse of(String code, String message, Map<String, String> fields) {
+        return new ErrorResponse(code, message, Instant.now(), fields);
+    }
+}
