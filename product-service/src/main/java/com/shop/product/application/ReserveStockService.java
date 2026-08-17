@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
  * Pessimistic rather than optimistic, because stock is a single hot row. Optimistic
  * locking would let one writer win and make the other nineteen fail — no oversell, but
  * a lot of spurious 409s. A write lock makes them queue instead of collide.
+ *
+ * The same transaction also appends the ledger line, so the balance and its explanation
+ * can never drift apart.
  */
 @Service
 public class ReserveStockService implements ReserveStockUseCase {
@@ -33,14 +36,14 @@ public class ReserveStockService implements ReserveStockUseCase {
     @Transactional
     public Product reserve(ReserveStockCommand command) {
         Product product = load(command.productId());
-        return saveProductPort.save(product.reserve(command.quantity()));
+        return saveProductPort.apply(product.reserve(command.quantity()));
     }
 
     @Override
     @Transactional
     public Product release(ReserveStockCommand command) {
         Product product = load(command.productId());
-        return saveProductPort.save(product.release(command.quantity()));
+        return saveProductPort.apply(product.release(command.quantity()));
     }
 
     private Product load(Long productId) {

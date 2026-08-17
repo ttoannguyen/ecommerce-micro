@@ -1,5 +1,6 @@
 package com.shop.product.adapter.out.persistence;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -18,8 +19,16 @@ public class ProductJpaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    // Explicit, because V1__init.sql states the same thing. Left implicit, Hibernate
+    // would assume nullable varchar(255) and numeric(38,2) — and `validate` does not
+    // compare length, precision or nullability, so the drift would go unnoticed.
+    @Column(nullable = false)
     private String name;
+
+    @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal price;
+
+    @Column(nullable = false)
     private int stock;
 
     /**

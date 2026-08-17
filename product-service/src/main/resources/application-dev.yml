@@ -8,7 +8,9 @@ spring:
     password: ""
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      # Flyway builds the schema here too, not Hibernate. Same migration files as
+      # Postgres, so a broken V*.sql fails on `spring-boot:run -Pdev`, not in prod.
+      ddl-auto: validate
   h2:
     console:
       enabled: true

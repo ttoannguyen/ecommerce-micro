@@ -6,6 +6,7 @@ import com.shop.product.domain.model.Product;
 import com.shop.product.domain.port.in.ReserveStockCommand;
 import com.shop.product.domain.port.in.ReserveStockUseCase;
 import com.shop.product.domain.port.out.LoadProductPort;
+import com.shop.product.domain.port.out.LoadStockLedgerPort;
 import com.shop.product.domain.port.out.SaveProductPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -52,11 +53,15 @@ class ReserveStockConcurrencyTest {
     @Autowired
     private LoadProductPort loadProductPort;
 
+    @Autowired
+    private LoadStockLedgerPort loadStockLedgerPort;
+
     @Test
     @DisplayName("20 threads reserve 1 each from stock of 5 -> exactly 5 succeed, stock lands on 0")
     void neverOversells() throws Exception {
-        Product product = saveProductPort.save(
-                Product.create("Contended item", Money.of(new BigDecimal("1000")), STOCK));
+        Product created = saveProductPort.save(
+                Product.create("Contended item", Money.of(new BigDecimal("1000"))));
+        Product product = saveProductPort.apply(created.receive(STOCK));
         Long productId = product.id();
 
         AtomicInteger succeeded = new AtomicInteger();
@@ -98,5 +103,11 @@ class ReserveStockConcurrencyTest {
 
         // The write lock serialises them, so nobody should ever lose an optimistic race.
         assertThat(lostTheRace.get()).isZero();
+
+        // The projection is not the only thing that has to survive the race. Under
+        // contention a lost ledger line would leave the balance unexplainable while the
+        // stock number still looked perfectly correct — the failure this table exists to
+        // make visible. One opening RECEIPT of 5, then exactly 5 ISSUEs of -1.
+        assertThat(loadStockLedgerPort.balanceOf(productId)).isEqualTo(remaining).isZero();
     }
 }

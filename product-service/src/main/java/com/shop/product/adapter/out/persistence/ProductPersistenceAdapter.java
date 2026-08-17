@@ -2,7 +2,10 @@ package com.shop.product.adapter.out.persistence;
 
 import com.shop.product.domain.model.Product;
 import com.shop.product.domain.model.ProductNotFoundException;
+import com.shop.product.domain.model.StockChange;
+import com.shop.product.domain.model.StockMovement;
 import com.shop.product.domain.port.out.LoadProductPort;
+import com.shop.product.domain.port.out.LoadStockLedgerPort;
 import com.shop.product.domain.port.out.SaveProductPort;
 import org.springframework.stereotype.Component;
 
@@ -11,12 +14,16 @@ import java.util.Optional;
 
 /** Outbound adapter: implements the load/save ports with Spring Data. */
 @Component
-public class ProductPersistenceAdapter implements LoadProductPort, SaveProductPort {
+public class ProductPersistenceAdapter
+        implements LoadProductPort, SaveProductPort, LoadStockLedgerPort {
 
     private final SpringDataProductRepository repository;
+    private final SpringDataStockMovementRepository movements;
 
-    public ProductPersistenceAdapter(SpringDataProductRepository repository) {
+    public ProductPersistenceAdapter(SpringDataProductRepository repository,
+                                     SpringDataStockMovementRepository movements) {
         this.repository = repository;
+        this.movements = movements;
     }
 
     @Override
@@ -40,18 +47,41 @@ public class ProductPersistenceAdapter implements LoadProductPort, SaveProductPo
     }
 
     @Override
+    public int balanceOf(Long productId) {
+        return movements.balanceOf(productId);
+    }
+
+    @Override
     public Product save(Product product) {
         if (product.id() == null) {
             return ProductMapper.toDomain(repository.save(ProductMapper.toEntity(product)));
         }
+        return ProductMapper.toDomain(repository.save(managed(product.id())));
+    }
+
+    /**
+     * Both writes, one transaction. The caller's @Transactional spans this method, so
+     * the ledger line and the new balance commit together or not at all — which is the
+     * only thing that keeps SUM(movements) == product.stock true under failure.
+     */
+    @Override
+    public Product apply(StockChange change) {
+        Product product = change.product();
+        StockMovement movement = change.movement();
+
+        movements.save(StockMovementMapper.toEntity(movement));
 
         // Update: do NOT build a fresh detached entity and merge it. That throws the
         // @Version away and quietly disables the lock. Mutate the managed entity instead
         // (already in the persistence context from the load earlier in this transaction),
         // so Hibernate dirty-checks it and emits WHERE version = ?
-        ProductJpaEntity managed = repository.findById(product.id())
-                .orElseThrow(() -> new ProductNotFoundException(product.id()));
+        ProductJpaEntity managed = managed(product.id());
         managed.changeStock(product.stock());
         return ProductMapper.toDomain(repository.save(managed));
+    }
+
+    private ProductJpaEntity managed(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException(id));
     }
 }

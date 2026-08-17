@@ -6,6 +6,7 @@ import com.shop.product.domain.port.out.LoadProductPort;
 import com.shop.product.domain.port.out.SaveProductPort;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
@@ -22,12 +23,23 @@ public class ProductDataSeeder implements CommandLineRunner {
     }
 
     @Override
+    @Transactional
     public void run(String... args) {
         if (loadProductPort.count() > 0) {
             return;
         }
-        saveProductPort.save(Product.create("Bàn phím cơ", Money.of(new BigDecimal("1200000")), 10));
-        saveProductPort.save(Product.create("Chuột không dây", Money.of(new BigDecimal("450000")), 25));
-        saveProductPort.save(Product.create("Màn hình 27inch", Money.of(new BigDecimal("5500000")), 5));
+        seed("Bàn phím cơ", new BigDecimal("1200000"), 10);
+        seed("Chuột không dây", new BigDecimal("450000"), 25);
+        seed("Màn hình 27inch", new BigDecimal("5500000"), 5);
+    }
+
+    /**
+     * Two steps, not one: the product is created empty, then the opening stock is
+     * RECEIVED. Seeded rows go through the same ledger as everything else, so they are
+     * not a permanent hole in `SUM(movements) == stock`.
+     */
+    private void seed(String name, BigDecimal price, int openingStock) {
+        Product saved = saveProductPort.save(Product.create(name, Money.of(price)));
+        saveProductPort.apply(saved.receive(openingStock));
     }
 }

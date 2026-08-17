@@ -6,7 +6,9 @@ spring:
     password: ""
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      # The migrations run against H2 on every `./mvnw test`. This is what stops
+      # V*.sql from rotting: a typo fails the build instead of the deploy.
+      ddl-auto: validate
     show-sql: false
 
 product-service:
