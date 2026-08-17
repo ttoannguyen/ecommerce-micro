@@ -5,6 +5,11 @@ package com.shop.product.domain.model;
  *
  * Product owns the stock, so the "never oversell" invariant is enforced HERE.
  * order-service cannot enforce it: all it ever sees is a copy that is already stale.
+ *
+ * `stock` is a projection of the ledger, never an independent number. That is why a
+ * new product starts at zero and has to be RECEIVED into existence: if stock could be
+ * conjured at creation time, `SUM(movements) == stock` would already be false on the
+ * first row, and every later audit would be meaningless.
  */
 public class Product {
 
@@ -23,9 +28,9 @@ public class Product {
         this.stock = stock;
     }
 
-    /** Creates a new product (no id yet). */
-    public static Product create(String name, Money price, int stock) {
-        return new Product(null, name, price, stock);
+    /** Creates a new product (no id yet, and no stock until something is received). */
+    public static Product create(String name, Money price) {
+        return new Product(null, name, price, 0);
     }
 
     /** Rebuilds from persistence (id already assigned). */
@@ -33,24 +38,54 @@ public class Product {
         return new Product(id, name, price, stock);
     }
 
+    /** Goods arrived: opening balance or a supplier delivery. */
+    public StockChange receive(int quantity) {
+        requirePositive(quantity);
+        return change(stock + quantity, StockMovement.receipt(requireId(), quantity));
+    }
+
     /** Reserve: take the stock off the shelf now. A decision, not a question. */
-    public Product reserve(int quantity) {
-        if (quantity <= 0) {
-            throw new IllegalArgumentException("quantity phải > 0");
-        }
+    public StockChange reserve(int quantity) {
+        requirePositive(quantity);
         if (stock < quantity) {
             throw new InsufficientStockException(
                     "Không đủ tồn kho. Còn " + stock + ", cần " + quantity);
         }
-        return new Product(id, name, price, stock - quantity);
+        return change(stock - quantity, StockMovement.issue(requireId(), quantity));
     }
 
     /** Compensation: put the stock back after the caller failed. */
-    public Product release(int quantity) {
+    public StockChange release(int quantity) {
+        requirePositive(quantity);
+        return change(stock + quantity, StockMovement.release(requireId(), quantity));
+    }
+
+    /**
+     * The shelf and the system disagreed. Record the difference as its own fact with
+     * a reason, rather than overwriting the balance and losing the discrepancy.
+     */
+    public StockChange adjust(int delta, ReasonCode reason) {
+        if (delta == 0) {
+            throw new IllegalArgumentException("điều chỉnh 0 không phải một sự kiện");
+        }
+        return change(stock + delta, StockMovement.adjustment(requireId(), delta, reason));
+    }
+
+    private StockChange change(int newStock, StockMovement movement) {
+        return new StockChange(new Product(id, name, price, newStock), movement);
+    }
+
+    private Long requireId() {
+        if (id == null) {
+            throw new IllegalStateException("product chưa được lưu, không thể ghi ledger");
+        }
+        return id;
+    }
+
+    private static void requirePositive(int quantity) {
         if (quantity <= 0) {
             throw new IllegalArgumentException("quantity phải > 0");
         }
-        return new Product(id, name, price, stock + quantity);
     }
 
     public Long id() {
