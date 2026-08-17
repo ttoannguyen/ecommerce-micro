@@ -21,3 +21,6 @@ Thumbs.db
 
 .env
 
+
+# CodeGraph index (local tool cache)
+.codegraph/
