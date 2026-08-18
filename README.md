@@ -1,6 +1,7 @@
 # ecommerce-micro — Order & Inventory Platform
 
-Microservice học tập. 2 service, DB riêng mỗi service, gọi nhau qua REST (OpenFeign).
+Microservice học tập. 2 service, DB riêng mỗi service, gọi nhau qua REST
+(OpenFeign) và phát event order qua transactional outbox/Kafka.
 
 ```
 Client ──POST /orders/batch──► Order Service ──POST /reservations/batch──► Product Service
@@ -72,6 +73,7 @@ com.shop.order
 └── adapter/
     ├── in/web/             # OrderController + DTO + GlobalExceptionHandler
     ├── out/persistence/    # OrderJpaEntity, OrderMapper, OrderPersistenceAdapter
+    ├── out/messaging/      # Outbox, Kafka publisher và event envelope
     └── out/client/         # ProductClient (Feign) + ProductClientAdapter
 ```
 
@@ -89,7 +91,8 @@ cd ecommerce-micro
 docker compose up --build
 ```
 
-Chờ 4 container lên: `postgres-product`, `postgres-order`, `product-service`, `order-service`.
+Chờ 5 container lên: `postgres-product`, `postgres-order`, `kafka`,
+`product-service`, `order-service`.
 
 ## Thử
 
@@ -109,6 +112,10 @@ curl -X POST http://localhost:8082/orders/batch \
   -H "Idempotency-Key: postman-order-batch-001" \
   -H "Content-Type: application/json" \
   -d '{"items":[{"productId":1,"quantity":2},{"productId":2,"quantity":1}]}'
+
+# Thanh toán hoặc hủy đơn theo id
+curl -X POST http://localhost:8082/orders/1/pay
+curl -X POST http://localhost:8082/orders/1/cancel
 
 # Xem đơn
 curl http://localhost:8082/orders

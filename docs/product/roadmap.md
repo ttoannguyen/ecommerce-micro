@@ -83,7 +83,9 @@ Phạm vi core đã hoàn thành với batch reservation atomic, state transitio
 release reservation khi cancel. Pagination và concurrency stress test còn lại
 là phần hardening tiếp theo.
 
-## Milestone 4 — Transactional messaging
+## Milestone 4 — Transactional messaging (completed)
+
+Implementation plan: [Transactional messaging](../implementation-plans/milestone-4-transactional-messaging.md).
 
 - Kafka, outbox event và publisher có retry/backoff.
 - Inbox/deduplication cho consumer.
@@ -91,8 +93,9 @@ là phần hardening tiếp theo.
 - Dead-letter topic và replay procedure.
 - Notification consumer nhỏ để chứng minh fan-out.
 
-Hoàn thành khi crash sau DB commit không làm mất event và duplicate không tạo
-side effect trùng.
+Đã có outbox cùng transaction, publisher retry/backoff, event envelope versioned,
+inbox deduplication, notification side effect và DLT config. Fault injection
+crash/replay DLT là phần hardening tiếp theo.
 
 ## Milestone 5 — Resilience và observability
 

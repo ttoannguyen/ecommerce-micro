@@ -74,6 +74,8 @@ orderdb                             productdb
 - H2 profile cho chạy local không cần PostgreSQL.
 - Module `integration-tests` dùng Testcontainers 2.0.5, PostgreSQL 16 và chạy hai
   application context với port động.
+- Order service có transactional outbox v5, Kafka publisher retry/backoff,
+  inbox deduplication và notification log; Compose chạy Kafka KRaft.
 - Integration test chứng minh Flyway PostgreSQL, reservation replay, order replay,
   idempotency conflict, insufficient stock và batch rollback qua OpenFeign.
 - OpenAPI/Swagger và Actuator health/info.
@@ -91,8 +93,8 @@ orderdb                             productdb
 
 ## Khoảng trống mức P2
 
-- Chưa có transactional outbox/Kafka.
-- Chưa có idempotent consumer hoặc dead-letter path.
+- Chưa có fault-injection test cho crash giữa DB commit và Kafka publish.
+- Chưa có endpoint vận hành để inspect/replay DLT có audit.
 - Chưa cấu hình timeout, retry có điều kiện, circuit breaker và bulkhead.
 - Chưa có structured logging, correlation ID, metrics và tracing.
 - Chưa có authentication/authorization.
@@ -106,7 +108,6 @@ orderdb                             productdb
 
 ## Quyết định tiếp theo
 
-Milestone tiếp theo là transactional messaging. Pagination và stress test
-concurrency sẽ được xử lý như hardening song song; không thêm Kafka/Gateway
-trước khi các failure path của reservation được chứng minh.
+Milestone tiếp theo là resilience và observability. Pagination, concurrency
+stress và fault-injection messaging sẽ được xử lý như hardening song song.
 Xem [roadmap](roadmap.md).

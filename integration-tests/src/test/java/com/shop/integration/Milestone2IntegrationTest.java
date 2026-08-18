@@ -12,15 +12,23 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
+import org.testcontainers.utility.DockerImageName;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,6 +44,9 @@ class Milestone2IntegrationTest {
 
     static final PostgreSQLContainer<?> orderDb = postgres("orderdb");
 
+    static final ConfluentKafkaContainer kafka = new ConfluentKafkaContainer(
+            DockerImageName.parse("confluentinc/cp-kafka:7.8.0"));
+
     private static ConfigurableApplicationContext productContext;
     private static ConfigurableApplicationContext orderContext;
     private static HttpClient http;
@@ -45,6 +56,7 @@ class Milestone2IntegrationTest {
 
     @BeforeAll
     static void startApplications() {
+        kafka.start();
         productDb.start();
         orderDb.start();
 
@@ -77,7 +89,12 @@ class Milestone2IntegrationTest {
                         "spring.datasource.password=" + orderDb.getPassword(),
                         "spring.flyway.locations=classpath:db/migration/order",
                         "spring.jpa.hibernate.ddl-auto=validate",
-                        "product-service.url=" + productBaseUrl)
+                        "product-service.url=" + productBaseUrl,
+                        "spring.kafka.bootstrap-servers=" + kafka.getBootstrapServers(),
+                        "messaging.outbox.enabled=true",
+                        "messaging.outbox.poll-interval-ms=250",
+                        "messaging.topic.orders=order-events",
+                        "messaging.consumer.group=integration-notification")
                 .run();
 
         int orderPort = orderContext.getEnvironment().getProperty("local.server.port", Integer.class);
@@ -96,6 +113,7 @@ class Milestone2IntegrationTest {
         }
         orderDb.stop();
         productDb.stop();
+        kafka.stop();
     }
 
     @Test
@@ -226,6 +244,63 @@ class Milestone2IntegrationTest {
                         .POST(HttpRequest.BodyPublishers.noBody())).body());
         assertThat(cancelled.get("status").asText()).isEqualTo("CANCELLED");
         assertThat(get(productBaseUrl + "/products/1").get("reserved").asInt()).isEqualTo(4);
+    }
+
+    @Test
+    @Order(6)
+    void outboxPublishesOrderEventsAndInboxDeduplicatesReplay() throws Exception {
+        assertThat(count("select count(*) from outbox_events"))
+                .as("six order transitions should have created outbox events")
+                .isEqualTo(6);
+        waitFor(() -> count("select count(*) from outbox_events where status = 'PUBLISHED'") >= 6,
+                Duration.ofSeconds(20));
+        waitFor(() -> count("select count(*) from notification_log") >= 6,
+                Duration.ofSeconds(20));
+
+        String event = firstEventPayload();
+        KafkaTemplate<String, String> template = orderContext.getBean(KafkaTemplate.class);
+        template.send("order-events", "replay", event).get(10, TimeUnit.SECONDS);
+
+        Thread.sleep(1500);
+        assertThat(count("select count(*) from notification_log")).isEqualTo(6);
+        assertThat(count("select count(*) from inbox_events")).isEqualTo(6);
+    }
+
+    private static long count(String sql) throws Exception {
+        try (Connection connection = DriverManager.getConnection(orderDb.getJdbcUrl(),
+                orderDb.getUsername(), orderDb.getPassword());
+             PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
+            result.next();
+            return result.getLong(1);
+        }
+    }
+
+    private static String firstEventPayload() throws Exception {
+        try (Connection connection = DriverManager.getConnection(orderDb.getJdbcUrl(),
+                orderDb.getUsername(), orderDb.getPassword());
+             PreparedStatement statement = connection.prepareStatement(
+                     "select payload from outbox_events order by occurred_at limit 1");
+             ResultSet result = statement.executeQuery()) {
+            assertThat(result.next()).isTrue();
+            return result.getString(1);
+        }
+    }
+
+    private static void waitFor(CheckedCondition condition, Duration timeout) throws Exception {
+        long deadline = System.nanoTime() + timeout.toNanos();
+        while (System.nanoTime() < deadline) {
+            if (condition.matches()) {
+                return;
+            }
+            Thread.sleep(250);
+        }
+        assertThat(condition.matches()).as("condition within " + timeout).isTrue();
+    }
+
+    @FunctionalInterface
+    private interface CheckedCondition {
+        boolean matches() throws Exception;
     }
 
     private static HttpRequest.Builder request(String url) {

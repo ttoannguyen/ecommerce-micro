@@ -13,3 +13,7 @@ spring:
 
 product-service:
   url: http://localhost:9999
+
+messaging:
+  outbox:
+    enabled: false

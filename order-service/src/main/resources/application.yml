@@ -4,6 +4,18 @@ server:
 spring:
   application:
     name: order-service
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:order-notification}
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+    listener:
+      ack-mode: record
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/orderdb
     username: ${DB_USER:postgres}
@@ -19,6 +31,16 @@ spring:
 
 product-service:
   url: ${PRODUCT_SERVICE_URL:http://localhost:8081}
+
+messaging:
+  outbox:
+    enabled: ${OUTBOX_ENABLED:false}
+    batch-size: ${OUTBOX_BATCH_SIZE:50}
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+  topic:
+    orders: ${ORDER_EVENTS_TOPIC:order-events}
+  consumer:
+    group: ${KAFKA_CONSUMER_GROUP:order-notification}
 
 management:
   endpoints:
