@@ -12,6 +12,7 @@ public enum ErrorCode {
     INVALID_REQUEST(HttpStatus.BAD_REQUEST),
     IDEMPOTENCY_CONFLICT(HttpStatus.CONFLICT),
     INSUFFICIENT_STOCK(HttpStatus.CONFLICT),
+    INVALID_ORDER_TRANSITION(HttpStatus.CONFLICT),
     PRODUCT_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE);
 
     private final HttpStatus status;

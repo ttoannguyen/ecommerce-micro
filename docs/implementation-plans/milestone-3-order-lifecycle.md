@@ -1,6 +1,6 @@
 # Milestone 3 — Order lifecycle
 
-Status: in progress  
+Status: completed
 Updated: 2026-08-18
 
 ## Mục tiêu
@@ -22,6 +22,9 @@ SKU nào bị giữ.
   `PAYMENT_PENDING`, `PAID`, `CANCELLED` và `FAILED`.
 - Reservation idempotency chuyển sang khóa `(caller, idempotency_key,
   product_id)` để một batch dùng chung idempotency key cho nhiều SKU.
+- `POST /orders/{id}/pay` và `POST /orders/{id}/cancel` chuyển trạng thái có
+  kiểm tra state machine; cancel release toàn bộ reservation của order.
+- `order_status_history` lưu sequence, trạng thái trước/sau và thời điểm.
 
 ## Verification
 
@@ -35,9 +38,8 @@ MAVEN_USER_HOME=/tmp/ecommerce-maven-m2 \
 Integration test dùng hai PostgreSQL container thật và chứng minh batch order
 giữ được hai SKU; khi SKU thứ hai thiếu hàng, SKU thứ nhất không bị giữ.
 
-## Phần còn lại
+## Phần mở rộng tiếp theo
 
-- Thêm command/API `pay`, `cancel` và transition history.
 - Hoàn thiện optimistic version/pagination cho order query.
 - Tách test class thành suite Milestone 3 riêng và thêm concurrency test cho
   hai batch có thứ tự SKU ngược nhau.
@@ -49,5 +51,6 @@ giữ được hai SKU; khi SKU thứ hai thiếu hàng, SKU thứ nhất không
 - [x] Lock SKU theo thứ tự ổn định.
 - [x] State machine domain cơ bản.
 - [x] Integration regression với PostgreSQL thật.
-- [ ] Payment/cancel transition API.
-- [ ] Transition history và pagination.
+- [x] Payment/cancel transition API cơ bản.
+- [x] Transition history.
+- [ ] Pagination.

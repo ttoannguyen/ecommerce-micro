@@ -201,6 +201,33 @@ class Milestone2IntegrationTest {
         assertThat(get(productBaseUrl + "/products/3").get("reserved").asInt()).isZero();
     }
 
+    @Test
+    @Order(5)
+    void orderPayAndCancelPersistStateTransitions() throws Exception {
+        HttpResponse<String> payable = send(request(orderBaseUrl + "/orders/batch")
+                .header("Idempotency-Key", "integration-pay-" + UUID.randomUUID())
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        "{\"items\":[{\"productId\":2,\"quantity\":1}]}")));
+        assertThat(payable.statusCode()).isEqualTo(201);
+        long payableId = json.readTree(payable.body()).get("id").asLong();
+
+        JsonNode paid = json.readTree(send(request(orderBaseUrl + "/orders/" + payableId + "/pay")
+                .POST(HttpRequest.BodyPublishers.noBody())).body());
+        assertThat(paid.get("status").asText()).isEqualTo("PAID");
+        assertThat(paid.get("transitions")).hasSize(2);
+
+        HttpResponse<String> cancellable = send(request(orderBaseUrl + "/orders/batch")
+                .header("Idempotency-Key", "integration-cancel-" + UUID.randomUUID())
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        "{\"items\":[{\"productId\":1,\"quantity\":1}]}")));
+        long cancellableId = json.readTree(cancellable.body()).get("id").asLong();
+        JsonNode cancelled = json.readTree(send(
+                request(orderBaseUrl + "/orders/" + cancellableId + "/cancel")
+                        .POST(HttpRequest.BodyPublishers.noBody())).body());
+        assertThat(cancelled.get("status").asText()).isEqualTo("CANCELLED");
+        assertThat(get(productBaseUrl + "/products/1").get("reserved").asInt()).isEqualTo(4);
+    }
+
     private static HttpRequest.Builder request(String url) {
         return HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(15))

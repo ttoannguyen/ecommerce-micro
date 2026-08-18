@@ -16,7 +16,8 @@ public record OrderResponse(
         BigDecimal totalPrice,
         String status,
         Instant createdAt,
-        List<OrderItemResponse> items) {
+        List<OrderItemResponse> items,
+        List<OrderTransitionResponse> transitions) {
 
     public static OrderResponse from(Order order) {
         return new OrderResponse(
@@ -27,6 +28,7 @@ public record OrderResponse(
                 order.totalPrice().amount(),
                 order.status().name(),
                 order.createdAt(),
-                order.items().stream().map(OrderItemResponse::from).toList());
+                order.items().stream().map(OrderItemResponse::from).toList(),
+                order.history().stream().map(OrderTransitionResponse::from).toList());
     }
 }

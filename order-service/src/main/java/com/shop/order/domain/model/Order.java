@@ -14,9 +14,17 @@ public class Order {
     private final Money totalPrice;
     private final OrderStatus status;
     private final Instant createdAt;
+    private final List<OrderTransition> history;
 
     private Order(Long id, List<OrderItem> items, String idempotencyKey,
                   Money totalPrice, OrderStatus status, Instant createdAt) {
+        this(id, items, idempotencyKey, totalPrice, status, createdAt,
+                List.of(new OrderTransition(0, null, status, createdAt)));
+    }
+
+    private Order(Long id, List<OrderItem> items, String idempotencyKey,
+                  Money totalPrice, OrderStatus status, Instant createdAt,
+                  List<OrderTransition> history) {
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("order phải có ít nhất một item");
         }
@@ -26,6 +34,7 @@ public class Order {
         this.totalPrice = totalPrice;
         this.status = status;
         this.createdAt = createdAt;
+        this.history = List.copyOf(history);
     }
 
     /** Backward-compatible single-line factory used by the first milestone tests. */
@@ -65,6 +74,12 @@ public class Order {
         return new Order(id, items, idempotencyKey, totalPrice, status, createdAt);
     }
 
+    public static Order rehydrate(Long id, List<OrderItem> items, String idempotencyKey,
+                                  Money totalPrice, OrderStatus status, Instant createdAt,
+                                  List<OrderTransition> history) {
+        return new Order(id, items, idempotencyKey, totalPrice, status, createdAt, history);
+    }
+
     public boolean matchesRequest(Long requestedProductId, int requestedQuantity) {
         return items.size() == 1
                 && productId().equals(requestedProductId)
@@ -84,6 +99,7 @@ public class Order {
     public Money totalPrice() { return totalPrice; }
     public OrderStatus status() { return status; }
     public Instant createdAt() { return createdAt; }
+    public List<OrderTransition> history() { return history; }
 
     /** Compatibility projections for clients of the single-SKU API. */
     public Long productId() { return items.get(0).productId(); }
@@ -92,15 +108,22 @@ public class Order {
 
     public Order transitionTo(OrderStatus target) {
         if (!isValidTransition(status, target)) {
-            throw new IllegalStateException("không thể chuyển order từ " + status + " sang " + target);
+            throw new InvalidOrderTransitionException(
+                    "không thể chuyển order từ " + status + " sang " + target);
         }
-        return new Order(id, items, idempotencyKey, totalPrice, target, createdAt);
+        OrderTransition transition = new OrderTransition(history.size(), status, target,
+                Instant.now());
+        List<OrderTransition> updatedHistory = new java.util.ArrayList<>(history);
+        updatedHistory.add(transition);
+        return new Order(id, items, idempotencyKey, totalPrice, target, createdAt,
+                updatedHistory);
     }
 
     private static boolean isValidTransition(OrderStatus from, OrderStatus to) {
         return switch (from) {
             case PENDING_RESERVATION -> to == OrderStatus.RESERVED || to == OrderStatus.FAILED;
-            case RESERVED -> to == OrderStatus.PAYMENT_PENDING || to == OrderStatus.CANCELLED;
+            case RESERVED -> to == OrderStatus.PAYMENT_PENDING
+                    || to == OrderStatus.PAID || to == OrderStatus.CANCELLED;
             case PAYMENT_PENDING -> to == OrderStatus.PAID || to == OrderStatus.CANCELLED;
             case CREATED -> to == OrderStatus.PAYMENT_PENDING || to == OrderStatus.CANCELLED;
             case PAID, CANCELLED, FAILED -> false;

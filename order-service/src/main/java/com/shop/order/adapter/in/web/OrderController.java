@@ -7,6 +7,7 @@ import com.shop.order.domain.model.Order;
 import com.shop.order.domain.port.in.FindOrdersUseCase;
 import com.shop.order.domain.port.in.PlaceOrderCommand;
 import com.shop.order.domain.port.in.PlaceOrderUseCase;
+import com.shop.order.domain.port.in.OrderLifecycleUseCase;
 import com.shop.order.domain.model.OrderItemDraft;
 import com.shop.order.domain.model.Quantity;
 import jakarta.validation.Valid;
@@ -29,10 +30,13 @@ public class OrderController {
 
     private final PlaceOrderUseCase placeOrderUseCase;
     private final FindOrdersUseCase findOrdersUseCase;
+    private final OrderLifecycleUseCase orderLifecycleUseCase;
 
-    public OrderController(PlaceOrderUseCase placeOrderUseCase, FindOrdersUseCase findOrdersUseCase) {
+    public OrderController(PlaceOrderUseCase placeOrderUseCase, FindOrdersUseCase findOrdersUseCase,
+                           OrderLifecycleUseCase orderLifecycleUseCase) {
         this.placeOrderUseCase = placeOrderUseCase;
         this.findOrdersUseCase = findOrdersUseCase;
+        this.orderLifecycleUseCase = orderLifecycleUseCase;
     }
 
     @PostMapping
@@ -68,5 +72,15 @@ public class OrderController {
                 .map(OrderResponse::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{id}/pay")
+    public OrderResponse pay(@PathVariable Long id) {
+        return OrderResponse.from(orderLifecycleUseCase.pay(id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    public OrderResponse cancel(@PathVariable Long id) {
+        return OrderResponse.from(orderLifecycleUseCase.cancel(id));
     }
 }
