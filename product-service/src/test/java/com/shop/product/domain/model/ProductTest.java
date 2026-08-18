@@ -10,122 +10,98 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ProductTest {
 
-    private static Product saved(int stock) {
-        return Product.rehydrate(1L, "Bàn phím cơ", Money.of(new BigDecimal("1200000")), stock);
+    private static Product saved(int onHand, int reserved) {
+        return Product.rehydrate(1L, "Bàn phím cơ",
+                Money.of(new BigDecimal("1200000")), onHand, reserved);
     }
 
     @Test
-    @DisplayName("tạo mới -> chưa có id, và stock bắt đầu từ 0")
+    @DisplayName("sản phẩm mới bắt đầu với on-hand/reserved/available bằng 0")
     void createStartsEmpty() {
-        Product product = Product.create("Bàn phím cơ", Money.of(new BigDecimal("1200000")));
+        Product product = Product.create("Bàn phím cơ", Money.of(BigDecimal.TEN));
 
-        assertThat(product.id()).isNull();
-        assertThat(product.stock()).isZero();
+        assertThat(product.onHand()).isZero();
+        assertThat(product.reserved()).isZero();
+        assertThat(product.available()).isZero();
     }
 
     @Test
-    @DisplayName("chưa lưu -> không ghi được ledger (movement phải có product id)")
-    void refusesLedgerWriteBeforePersist() {
-        Product unsaved = Product.create("Chưa lưu", Money.of(BigDecimal.TEN));
+    @DisplayName("receipt tăng on-hand và ghi movement dương")
+    void receiveChangesPhysicalInventory() {
+        StockChange change = saved(0, 0).receive(10);
 
-        assertThatThrownBy(() -> unsaved.receive(5))
-                .isInstanceOf(IllegalStateException.class);
-    }
-
-    @Test
-    @DisplayName("nhập hàng -> stock tăng, sinh movement RECEIPT dương")
-    void receiveAddsStock() {
-        StockChange change = saved(0).receive(10);
-
-        assertThat(change.product().stock()).isEqualTo(10);
+        assertThat(change.product().onHand()).isEqualTo(10);
+        assertThat(change.product().reserved()).isZero();
         assertThat(change.movement().type()).isEqualTo(MovementType.RECEIPT);
         assertThat(change.movement().quantity()).isEqualTo(10);
     }
 
     @Test
-    @DisplayName("reserve -> stock giảm, movement ISSUE mang dấu âm")
-    void reserveIssuesNegativeMovement() {
-        StockChange change = saved(10).reserve(3);
+    @DisplayName("hold chỉ tăng reserved, không giảm on-hand")
+    void holdOnlyChangesAllocation() {
+        Product held = saved(10, 0).hold(3);
 
-        assertThat(change.product().stock()).isEqualTo(7);
-        assertThat(change.movement().type()).isEqualTo(MovementType.ISSUE);
-        assertThat(change.movement().quantity()).isEqualTo(-3);
+        assertThat(held.onHand()).isEqualTo(10);
+        assertThat(held.reserved()).isEqualTo(3);
+        assertThat(held.available()).isEqualTo(7);
     }
 
     @Test
-    @DisplayName("reserve quá tồn -> chặn, không sinh movement nào")
-    void reserveRefusesWhenShort() {
-        assertThatThrownBy(() -> saved(2).reserve(3))
+    @DisplayName("hold kiểm tra available thay vì on-hand")
+    void holdRefusesWhenAvailableIsShort() {
+        assertThatThrownBy(() -> saved(10, 8).hold(3))
                 .isInstanceOf(InsufficientStockException.class)
                 .hasMessageContaining("Còn 2, cần 3");
     }
 
     @Test
-    @DisplayName("release -> trả hàng về, movement RELEASE dương")
-    void releaseReturnsStock() {
-        StockChange change = saved(7).release(3);
+    @DisplayName("release hold chỉ giảm reserved")
+    void releaseOnlyChangesAllocation() {
+        Product released = saved(10, 4).releaseHold(3);
 
-        assertThat(change.product().stock()).isEqualTo(10);
-        assertThat(change.movement().type()).isEqualTo(MovementType.RELEASE);
-        assertThat(change.movement().quantity()).isEqualTo(3);
+        assertThat(released.onHand()).isEqualTo(10);
+        assertThat(released.reserved()).isEqualTo(1);
+        assertThat(released.available()).isEqualTo(9);
     }
 
     @Test
-    @DisplayName("điều chỉnh giảm -> ghi nhận chênh lệch kèm lý do, không nuốt mất")
-    void adjustRecordsDiscrepancy() {
-        StockChange change = saved(10).adjust(-2, ReasonCode.CYCLE_COUNT);
+    @DisplayName("fulfillment giảm on-hand và reserved, ghi ISSUE")
+    void fulfillmentCreatesPhysicalIssue() {
+        StockChange fulfilled = saved(10, 4).fulfill(3);
 
-        assertThat(change.product().stock()).isEqualTo(8);
-        assertThat(change.movement().type()).isEqualTo(MovementType.ADJUSTMENT);
-        assertThat(change.movement().quantity()).isEqualTo(-2);
-        assertThat(change.movement().reason()).isEqualTo(ReasonCode.CYCLE_COUNT);
+        assertThat(fulfilled.product().onHand()).isEqualTo(7);
+        assertThat(fulfilled.product().reserved()).isEqualTo(1);
+        assertThat(fulfilled.movement().type()).isEqualTo(MovementType.ISSUE);
+        assertThat(fulfilled.movement().quantity()).isEqualTo(-3);
     }
 
     @Test
-    @DisplayName("điều chỉnh 0 -> không phải sự kiện, chặn")
-    void rejectsZeroAdjustment() {
-        assertThatThrownBy(() -> saved(10).adjust(0, ReasonCode.CORRECTION))
+    @DisplayName("không thể release hoặc fulfill nhiều hơn reserved")
+    void cannotConsumeMissingReservation() {
+        assertThatThrownBy(() -> saved(10, 2).releaseHold(3))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> saved(10, 2).fulfill(3))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("reserved luôn nằm trong 0..onHand")
+    void validatesBalanceInvariant() {
+        assertThatThrownBy(() -> Product.rehydrate(
+                1L, "Sai", Money.of(BigDecimal.TEN), 2, 3))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> saved(10, 8).adjust(-3, ReasonCode.DAMAGE))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    @DisplayName("quantity <= 0 -> chặn ở mọi cửa")
-    void rejectsNonPositiveQuantity() {
-        assertThatThrownBy(() -> saved(10).reserve(0))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("quantity phải > 0");
-        assertThatThrownBy(() -> saved(10).receive(-1))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("quantity phải > 0");
-    }
+    @DisplayName("adjustment thay đổi on-hand và bắt buộc có ledger reason")
+    void adjustmentKeepsLedgerExplainable() {
+        StockChange change = saved(10, 2).adjust(-2, ReasonCode.CYCLE_COUNT);
 
-    @Test
-    @DisplayName("stock âm -> chặn ngay ở constructor")
-    void rejectsNegativeStock() {
-        assertThatThrownBy(() -> Product.rehydrate(1L, "Sai", Money.of(BigDecimal.TEN), -1))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("stock không được âm");
-    }
-
-    @Test
-    @DisplayName("rehydrate -> giữ nguyên id từ DB")
-    void rehydrateKeepsId() {
-        assertThat(Product.rehydrate(7L, "Chuột", Money.of(BigDecimal.ONE), 3).id()).isEqualTo(7L);
-    }
-
-    @Test
-    @DisplayName("chuỗi thao tác -> stock luôn bằng tổng các movement")
-    void stockAlwaysEqualsLedgerSum() {
-        StockChange received = saved(0).receive(10);
-        StockChange reserved = received.product().reserve(4);
-        StockChange released = reserved.product().release(1);
-        StockChange adjusted = released.product().adjust(-2, ReasonCode.DAMAGE);
-
-        int ledger = received.movement().quantity()
-                + reserved.movement().quantity()
-                + released.movement().quantity()
-                + adjusted.movement().quantity();
-
-        assertThat(adjusted.product().stock()).isEqualTo(ledger).isEqualTo(5);
+        assertThat(change.product().onHand()).isEqualTo(8);
+        assertThat(change.product().reserved()).isEqualTo(2);
+        assertThat(change.movement().type()).isEqualTo(MovementType.ADJUSTMENT);
+        assertThat(change.movement().quantity()).isEqualTo(-2);
     }
 }

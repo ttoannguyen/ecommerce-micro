@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -32,9 +33,12 @@ public class OrderController {
     }
 
     @PostMapping
-    public ResponseEntity<OrderResponse> create(@Valid @RequestBody CreateOrderRequest request) {
+    public ResponseEntity<OrderResponse> create(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody CreateOrderRequest request) {
         Order order = placeOrderUseCase.placeOrder(
-                new PlaceOrderCommand(request.productId(), request.quantity()));
+                new PlaceOrderCommand(
+                        request.productId(), request.quantity(), idempotencyKey));
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }
 

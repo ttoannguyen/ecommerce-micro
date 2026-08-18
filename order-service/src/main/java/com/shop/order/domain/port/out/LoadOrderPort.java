@@ -11,4 +11,6 @@ public interface LoadOrderPort {
     List<Order> findAll();
 
     Optional<Order> findById(Long id);
+
+    Optional<Order> findByIdempotencyKey(String idempotencyKey);
 }

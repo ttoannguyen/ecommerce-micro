@@ -9,6 +9,9 @@ public interface SaveProductPort {
     /** Creates or renames a product. Never touches the stock — only {@link #apply} does. */
     Product save(Product product);
 
+    /** Writes only allocation fields; hold/release/expire are not physical movements. */
+    Product updateBalance(Product product);
+
     /**
      * Writes the new balance and the ledger line that explains it, atomically.
      *

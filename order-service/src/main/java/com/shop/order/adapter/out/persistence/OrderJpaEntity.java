@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 /** JPA record for Order. Separate from the domain aggregate — annotations live here. */
 @Entity
@@ -24,6 +25,12 @@ public class OrderJpaEntity {
     // compare length, precision or nullability, so the drift would go unnoticed.
     @Column(nullable = false)
     private Long productId;
+
+    @Column
+    private UUID reservationId;
+
+    @Column(length = 128, unique = true)
+    private String idempotencyKey;
 
     @Column(nullable = false)
     private int quantity;
@@ -41,10 +48,13 @@ public class OrderJpaEntity {
     protected OrderJpaEntity() {
     }
 
-    public OrderJpaEntity(Long id, Long productId, int quantity,
+    public OrderJpaEntity(Long id, Long productId, UUID reservationId,
+                          String idempotencyKey, int quantity,
                           BigDecimal totalPrice, String status, Instant createdAt) {
         this.id = id;
         this.productId = productId;
+        this.reservationId = reservationId;
+        this.idempotencyKey = idempotencyKey;
         this.quantity = quantity;
         this.totalPrice = totalPrice;
         this.status = status;
@@ -57,6 +67,14 @@ public class OrderJpaEntity {
 
     public Long getProductId() {
         return productId;
+    }
+
+    public UUID getReservationId() {
+        return reservationId;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
     }
 
     public int getQuantity() {

@@ -5,6 +5,9 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+
+import java.util.UUID;
 
 /**
  * Calls product-service over HTTP. Order never touches productdb — it has to ask.
@@ -15,8 +18,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 public interface ProductClient {
 
     @PostMapping("/products/{id}/reservations")
-    ReservationResponse reserve(@PathVariable("id") Long id, @RequestBody ReserveStockRequest request);
+    ReservationResponse reserve(
+            @PathVariable("id") Long id,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("X-Caller-Id") String caller,
+            @RequestBody ReserveStockRequest request);
 
-    @DeleteMapping("/products/{id}/reservations")
-    void release(@PathVariable("id") Long id, @RequestBody ReserveStockRequest request);
+    @DeleteMapping("/reservations/{id}")
+    void release(@PathVariable("id") UUID reservationId);
 }

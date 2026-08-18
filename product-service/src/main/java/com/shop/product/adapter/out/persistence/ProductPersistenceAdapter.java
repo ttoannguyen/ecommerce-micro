@@ -59,10 +59,17 @@ public class ProductPersistenceAdapter
         return ProductMapper.toDomain(repository.save(managed(product.id())));
     }
 
+    @Override
+    public Product updateBalance(Product product) {
+        ProductJpaEntity managed = managed(product.id());
+        managed.changeBalance(product.onHand(), product.reserved());
+        return ProductMapper.toDomain(repository.save(managed));
+    }
+
     /**
      * Both writes, one transaction. The caller's @Transactional spans this method, so
      * the ledger line and the new balance commit together or not at all — which is the
-     * only thing that keeps SUM(movements) == product.stock true under failure.
+     * only thing that keeps SUM(movements) == product.onHand true under failure.
      */
     @Override
     public Product apply(StockChange change) {
@@ -76,7 +83,7 @@ public class ProductPersistenceAdapter
         // (already in the persistence context from the load earlier in this transaction),
         // so Hibernate dirty-checks it and emits WHERE version = ?
         ProductJpaEntity managed = managed(product.id());
-        managed.changeStock(product.stock());
+        managed.changeBalance(product.onHand(), product.reserved());
         return ProductMapper.toDomain(repository.save(managed));
     }
 

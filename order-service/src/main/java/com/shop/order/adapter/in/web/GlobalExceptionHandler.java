@@ -2,6 +2,7 @@ package com.shop.order.adapter.in.web;
 
 import com.shop.order.adapter.in.web.dto.ErrorResponse;
 import com.shop.order.domain.model.InsufficientStockException;
+import com.shop.order.domain.model.IdempotencyConflictException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -18,6 +19,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InsufficientStockException.class)
     public ResponseEntity<ErrorResponse> handleStock(InsufficientStockException ex) {
         return build(ErrorCode.INSUFFICIENT_STOCK, ex.getMessage());
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ErrorResponse> handleIdempotencyConflict(
+            IdempotencyConflictException ex) {
+        return build(ErrorCode.IDEMPOTENCY_CONFLICT, ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

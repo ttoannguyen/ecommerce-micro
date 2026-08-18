@@ -16,7 +16,8 @@ public enum MovementType {
     /** Stock leaving: taken off the shelf for an order. */
     ISSUE,
 
-    /** Stock coming back after the caller failed and compensated. */
+    /** Legacy history created before reservations were separated from movements. */
+    @Deprecated
     RELEASE,
 
     /** Correction after a physical count. Either direction, and it must say why. */

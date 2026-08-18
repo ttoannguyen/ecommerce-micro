@@ -1,12 +1,13 @@
 package com.shop.product.application;
 
 import com.shop.product.domain.model.InsufficientStockException;
+import com.shop.product.domain.model.InventoryReconciliation;
 import com.shop.product.domain.model.Money;
 import com.shop.product.domain.model.Product;
-import com.shop.product.domain.port.in.ReserveStockCommand;
-import com.shop.product.domain.port.in.ReserveStockUseCase;
+import com.shop.product.domain.port.in.HoldReservationCommand;
+import com.shop.product.domain.port.in.ReconcileInventoryUseCase;
+import com.shop.product.domain.port.in.ReservationUseCase;
 import com.shop.product.domain.port.out.LoadProductPort;
-import com.shop.product.domain.port.out.LoadStockLedgerPort;
 import com.shop.product.domain.port.out.SaveProductPort;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,41 +25,21 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * The test that justifies the whole reserve refactor.
- *
- * 20 threads race for 5 items. The old design (order-service reads stock over HTTP,
- * checks it in Java, then saves) cannot pass this: every thread reads stock=5, every
- * thread concludes "enough", and 20 orders get created for 5 items.
- *
- * Here the check and the write happen in one transaction, on the row that owns the
- * stock, behind SELECT ... FOR UPDATE. Exactly 5 threads win. Not 4, not 6.
- *
- * The 15 losers get InsufficientStockException — an honest business answer ("it is
- * gone") — and not an optimistic-locking error, which would just mean "try again".
- */
 @SpringBootTest
 @ActiveProfiles("test")
-class ReserveStockConcurrencyTest {
+class ReservationConcurrencyTest {
 
     private static final int STOCK = 5;
     private static final int THREADS = 20;
 
-    @Autowired
-    private ReserveStockUseCase reserveStockUseCase;
-
-    @Autowired
-    private SaveProductPort saveProductPort;
-
-    @Autowired
-    private LoadProductPort loadProductPort;
-
-    @Autowired
-    private LoadStockLedgerPort loadStockLedgerPort;
+    @Autowired ReservationUseCase reservations;
+    @Autowired SaveProductPort saveProductPort;
+    @Autowired LoadProductPort loadProductPort;
+    @Autowired ReconcileInventoryUseCase reconciliation;
 
     @Test
-    @DisplayName("20 threads reserve 1 each from stock of 5 -> exactly 5 succeed, stock lands on 0")
-    void neverOversells() throws Exception {
+    @DisplayName("20 hold tranh 5 available -> đúng 5 HELD, on-hand không đổi")
+    void neverOverReserves() throws Exception {
         Product created = saveProductPort.save(
                 Product.create("Contended item", Money.of(new BigDecimal("1000"))));
         Product product = saveProductPort.apply(created.receive(STOCK));
@@ -67,21 +48,21 @@ class ReserveStockConcurrencyTest {
         AtomicInteger succeeded = new AtomicInteger();
         AtomicInteger soldOut = new AtomicInteger();
         AtomicInteger lostTheRace = new AtomicInteger();
-
-        CountDownLatch startGun = new CountDownLatch(1);
+        CountDownLatch start = new CountDownLatch(1);
         CountDownLatch finished = new CountDownLatch(THREADS);
         ExecutorService pool = Executors.newFixedThreadPool(THREADS);
 
         for (int i = 0; i < THREADS; i++) {
+            String key = "concurrent-" + productId + "-" + i;
             pool.submit(() -> {
                 try {
-                    startGun.await();
-                    reserveStockUseCase.reserve(new ReserveStockCommand(productId, 1));
+                    start.await();
+                    reservations.hold(new HoldReservationCommand(
+                            productId, 1, "test", key));
                     succeeded.incrementAndGet();
                 } catch (InsufficientStockException soldOutForReal) {
                     soldOut.incrementAndGet();
                 } catch (OptimisticLockingFailureException lost) {
-                    // Someone else updated the row first. Not oversold — just a retry.
                     lostTheRace.incrementAndGet();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -91,23 +72,21 @@ class ReserveStockConcurrencyTest {
             });
         }
 
-        startGun.countDown();
+        start.countDown();
         assertThat(finished.await(30, TimeUnit.SECONDS)).isTrue();
         pool.shutdown();
 
-        int remaining = loadProductPort.findById(productId).orElseThrow().stock();
-
+        Product finalBalance = loadProductPort.findById(productId).orElseThrow();
         assertThat(succeeded.get()).isEqualTo(STOCK);
         assertThat(soldOut.get()).isEqualTo(THREADS - STOCK);
-        assertThat(remaining).isZero();
-
-        // The write lock serialises them, so nobody should ever lose an optimistic race.
         assertThat(lostTheRace.get()).isZero();
+        assertThat(finalBalance.onHand()).isEqualTo(STOCK);
+        assertThat(finalBalance.reserved()).isEqualTo(STOCK);
+        assertThat(finalBalance.available()).isZero();
 
-        // The projection is not the only thing that has to survive the race. Under
-        // contention a lost ledger line would leave the balance unexplainable while the
-        // stock number still looked perfectly correct — the failure this table exists to
-        // make visible. One opening RECEIPT of 5, then exactly 5 ISSUEs of -1.
-        assertThat(loadStockLedgerPort.balanceOf(productId)).isEqualTo(remaining).isZero();
+        InventoryReconciliation result = reconciliation.reconcile(productId);
+        assertThat(result.consistent()).isTrue();
+        assertThat(result.expectedOnHand()).isEqualTo(STOCK);
+        assertThat(result.expectedReserved()).isEqualTo(STOCK);
     }
 }

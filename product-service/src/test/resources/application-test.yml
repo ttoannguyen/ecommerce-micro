@@ -10,3 +10,7 @@ spring:
       # V*.sql from rotting: a typo fails the build instead of the deploy.
       ddl-auto: validate
     show-sql: false
+
+inventory:
+  reservation:
+    expiry-enabled: false

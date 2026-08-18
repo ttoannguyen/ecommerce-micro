@@ -56,10 +56,6 @@ public final class StockMovement {
         return new StockMovement(null, productId, -quantity, MovementType.ISSUE, null, Instant.now());
     }
 
-    static StockMovement release(Long productId, int quantity) {
-        return new StockMovement(null, productId, quantity, MovementType.RELEASE, null, Instant.now());
-    }
-
     static StockMovement adjustment(Long productId, int delta, ReasonCode reason) {
         return new StockMovement(null, productId, delta, MovementType.ADJUSTMENT, reason, Instant.now());
     }

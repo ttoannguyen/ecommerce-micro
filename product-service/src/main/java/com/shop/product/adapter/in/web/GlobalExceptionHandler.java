@@ -2,7 +2,11 @@ package com.shop.product.adapter.in.web;
 
 import com.shop.product.adapter.in.web.dto.ErrorResponse;
 import com.shop.product.domain.model.InsufficientStockException;
+import com.shop.product.domain.model.IdempotencyConflictException;
+import com.shop.product.domain.model.InvalidReservationTransitionException;
 import com.shop.product.domain.model.ProductNotFoundException;
+import com.shop.product.domain.model.ReservationNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -25,6 +29,30 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ProductNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(ProductNotFoundException ex) {
         return build(ErrorCode.PRODUCT_NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(ReservationNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleReservationNotFound(
+            ReservationNotFoundException ex) {
+        return build(ErrorCode.RESERVATION_NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    public ResponseEntity<ErrorResponse> handleIdempotencyConflict(
+            IdempotencyConflictException ex) {
+        return build(ErrorCode.IDEMPOTENCY_CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidReservationTransitionException.class)
+    public ResponseEntity<ErrorResponse> handleTransition(
+            InvalidReservationTransitionException ex) {
+        return build(ErrorCode.INVALID_RESERVATION_TRANSITION, ex.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraint(DataIntegrityViolationException ex) {
+        return build(ErrorCode.IDEMPOTENCY_CONFLICT,
+                "Idempotency-Key đã được dùng bởi request đồng thời khác");
     }
 
     /**

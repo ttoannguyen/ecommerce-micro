@@ -20,7 +20,7 @@ public class OrderPersistenceAdapter implements SaveOrderPort, LoadOrderPort {
 
     @Override
     public Order save(Order order) {
-        return OrderMapper.toDomain(repository.save(OrderMapper.toEntity(order)));
+        return OrderMapper.toDomain(repository.saveAndFlush(OrderMapper.toEntity(order)));
     }
 
     @Override
@@ -31,5 +31,10 @@ public class OrderPersistenceAdapter implements SaveOrderPort, LoadOrderPort {
     @Override
     public Optional<Order> findById(Long id) {
         return repository.findById(id).map(OrderMapper::toDomain);
+    }
+
+    @Override
+    public Optional<Order> findByIdempotencyKey(String idempotencyKey) {
+        return repository.findByIdempotencyKey(idempotencyKey).map(OrderMapper::toDomain);
     }
 }

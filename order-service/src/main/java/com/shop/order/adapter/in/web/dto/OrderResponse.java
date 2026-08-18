@@ -4,11 +4,13 @@ import com.shop.order.domain.model.Order;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 /** HTTP view of an order. Keeps the aggregate away from the wire format. */
 public record OrderResponse(
         Long id,
         Long productId,
+        UUID reservationId,
         int quantity,
         BigDecimal totalPrice,
         String status,
@@ -18,6 +20,7 @@ public record OrderResponse(
         return new OrderResponse(
                 order.id(),
                 order.productId(),
+                order.reservationId(),
                 order.quantity().value(),
                 order.totalPrice().amount(),
                 order.status().name(),

@@ -1,8 +1,11 @@
 package com.shop.order.domain.model;
 
+import java.time.Instant;
+import java.util.UUID;
+
 /**
- * Proof that product-service has already taken the stock off the shelf for us,
- * inside its own transaction. Anti-corruption boundary of the Order context.
+ * Proof that product-service created a time-bound hold inside its own transaction.
+ * Anti-corruption boundary of the Order context.
  *
  * Deliberately carries no `stock` field: Order must not be tempted to re-check an
  * invariant it does not own. The old ProductSnapshot did carry stock, and that was
@@ -11,17 +14,26 @@ package com.shop.order.domain.model;
 public final class ReservedProduct {
 
     private final Long productId;
+    private final UUID reservationId;
     private final String name;
     private final Money price;
+    private final Instant expiresAt;
 
-    public ReservedProduct(Long productId, String name, Money price) {
+    public ReservedProduct(Long productId, UUID reservationId, String name,
+                           Money price, Instant expiresAt) {
         this.productId = productId;
+        this.reservationId = reservationId;
         this.name = name;
         this.price = price;
+        this.expiresAt = expiresAt;
     }
 
     public Long productId() {
         return productId;
+    }
+
+    public UUID reservationId() {
+        return reservationId;
     }
 
     public String name() {
@@ -30,5 +42,9 @@ public final class ReservedProduct {
 
     public Money price() {
         return price;
+    }
+
+    public Instant expiresAt() {
+        return expiresAt;
     }
 }

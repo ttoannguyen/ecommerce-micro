@@ -31,6 +31,8 @@ class OpenApiDocsTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.openapi").exists())
                 .andExpect(jsonPath("$.paths['/products']").exists())
-                .andExpect(jsonPath("$.paths['/products/{id}']").exists());
+                .andExpect(jsonPath("$.paths['/products/{id}']").exists())
+                .andExpect(jsonPath("$.paths['/products/{id}/reservations']").exists())
+                .andExpect(jsonPath("$.paths['/reservations/{id}']").exists());
     }
 }

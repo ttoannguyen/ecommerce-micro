@@ -30,6 +30,7 @@ class OrderValidationTest {
     @DisplayName("quantity = 0 -> 400 kèm lỗi field, không gọi product-service")
     void rejectsNonPositiveQuantity() throws Exception {
         mockMvc.perform(post("/orders")
+                        .header("Idempotency-Key", "validation-quantity")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"productId\":1,\"quantity\":0}"))
                 .andExpect(status().isBadRequest())
@@ -41,10 +42,20 @@ class OrderValidationTest {
     @DisplayName("thiếu productId -> 400")
     void rejectsMissingProductId() throws Exception {
         mockMvc.perform(post("/orders")
+                        .header("Idempotency-Key", "validation-product")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"quantity\":2}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.fields.productId").value("productId là bắt buộc"));
+    }
+
+    @Test
+    @DisplayName("thiếu Idempotency-Key -> 400 trước khi tạo reservation")
+    void rejectsMissingIdempotencyKey() throws Exception {
+        mockMvc.perform(post("/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"productId\":1,\"quantity\":2}"))
+                .andExpect(status().isBadRequest());
     }
 
     @Test

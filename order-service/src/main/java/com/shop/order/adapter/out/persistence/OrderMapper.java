@@ -15,6 +15,8 @@ final class OrderMapper {
         return new OrderJpaEntity(
                 order.id(),
                 order.productId(),
+                order.reservationId(),
+                order.idempotencyKey(),
                 order.quantity().value(),
                 order.totalPrice().amount(),
                 order.status().name(),
@@ -25,6 +27,8 @@ final class OrderMapper {
         return Order.rehydrate(
                 entity.getId(),
                 entity.getProductId(),
+                entity.getReservationId(),
+                entity.getIdempotencyKey(),
                 Quantity.of(entity.getQuantity()),
                 Money.of(entity.getTotalPrice()),
                 OrderStatus.valueOf(entity.getStatus()),

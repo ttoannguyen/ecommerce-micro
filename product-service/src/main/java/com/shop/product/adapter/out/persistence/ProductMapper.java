@@ -14,7 +14,8 @@ final class ProductMapper {
                 product.id(),
                 product.name(),
                 product.price().amount(),
-                product.stock());
+                product.onHand(),
+                product.reserved());
     }
 
     static Product toDomain(ProductJpaEntity entity) {
@@ -22,6 +23,7 @@ final class ProductMapper {
                 entity.getId(),
                 entity.getName(),
                 Money.of(entity.getPrice()),
-                entity.getStock());
+                entity.getOnHand(),
+                entity.getReserved());
     }
 }

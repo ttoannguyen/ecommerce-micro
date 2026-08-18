@@ -1,18 +1,21 @@
 package com.shop.product.adapter.in.web;
 
 import com.shop.product.adapter.in.web.dto.ProductResponse;
+import com.shop.product.adapter.in.web.dto.ReconciliationResponse;
 import com.shop.product.adapter.in.web.dto.ReservationResponse;
 import com.shop.product.adapter.in.web.dto.ReserveStockRequest;
 import com.shop.product.domain.port.in.FindProductsUseCase;
-import com.shop.product.domain.port.in.ReserveStockCommand;
-import com.shop.product.domain.port.in.ReserveStockUseCase;
+import com.shop.product.domain.port.in.HoldReservationCommand;
+import com.shop.product.domain.port.in.ReconcileInventoryUseCase;
+import com.shop.product.domain.port.in.ReservationUseCase;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,12 +27,15 @@ import java.util.List;
 public class ProductController {
 
     private final FindProductsUseCase findProductsUseCase;
-    private final ReserveStockUseCase reserveStockUseCase;
+    private final ReservationUseCase reservationUseCase;
+    private final ReconcileInventoryUseCase reconcileInventoryUseCase;
 
     public ProductController(FindProductsUseCase findProductsUseCase,
-                             ReserveStockUseCase reserveStockUseCase) {
+                             ReservationUseCase reservationUseCase,
+                             ReconcileInventoryUseCase reconcileInventoryUseCase) {
         this.findProductsUseCase = findProductsUseCase;
-        this.reserveStockUseCase = reserveStockUseCase;
+        this.reservationUseCase = reservationUseCase;
+        this.reconcileInventoryUseCase = reconcileInventoryUseCase;
     }
 
     @GetMapping
@@ -45,19 +51,21 @@ public class ProductController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** Reserves stock immediately. 409 when there is not enough. */
+    /** Creates an idempotent, time-bound hold. */
     @PostMapping("/{id}/reservations")
-    public ReservationResponse reserve(@PathVariable Long id,
-                                       @Valid @RequestBody ReserveStockRequest request) {
-        return ReservationResponse.from(
-                reserveStockUseCase.reserve(new ReserveStockCommand(id, request.quantity())));
+    public ResponseEntity<ReservationResponse> reserve(
+            @PathVariable Long id,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader(name = "X-Caller-Id", defaultValue = "api") String caller,
+            @Valid @RequestBody ReserveStockRequest request) {
+        ReservationResponse response = ReservationResponse.from(
+                reservationUseCase.hold(new HoldReservationCommand(
+                        id, request.quantity(), caller, idempotencyKey)));
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    /** Compensation: put the stock back after the caller failed. */
-    @DeleteMapping("/{id}/reservations")
-    public ReservationResponse release(@PathVariable Long id,
-                                       @Valid @RequestBody ReserveStockRequest request) {
-        return ReservationResponse.from(
-                reserveStockUseCase.release(new ReserveStockCommand(id, request.quantity())));
+    @GetMapping("/{id}/reconciliation")
+    public ReconciliationResponse reconcile(@PathVariable Long id) {
+        return ReconciliationResponse.from(reconcileInventoryUseCase.reconcile(id));
     }
 }

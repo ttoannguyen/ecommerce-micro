@@ -1,0 +1,106 @@
+# Hiện trạng dự án
+
+- Updated: 2026-08-18
+- Branch reviewed: main
+- Scope: root build, reservation lifecycle, order-service, product-service,
+  Docker Compose và test hiện có
+
+## Tóm tắt
+
+Dự án đã có reservation identity, TTL, idempotency và stock ledger. Hold không
+còn bị mô hình như xuất kho vật lý: Product tách on-hand, reserved và available;
+Order lưu reference tới reservation. Khoảng trống lớn nhất tiếp theo là evidence
+trên PostgreSQL/OpenFeign thật và các failure path xuyên service.
+
+## Kiến trúc đang chạy
+
+~~~text
+Client
+  |
+  v
+Order Service -- REST/OpenFeign --> Product Service
+  |                                    |
+orderdb                             productdb
+~~~
+
+- Mỗi service có PostgreSQL riêng.
+- Flyway sở hữu schema; Hibernate chạy validate.
+- Profile dev và test dùng H2.
+- Docker Compose khởi động hai database và hai application.
+
+## Phần đã có
+
+### Service boundary
+
+- Order không truy cập productdb.
+- Product là nơi quyết định đủ tồn kho.
+- HTTP status được dịch ở web adapter, không đi vào domain.
+- Domain không phụ thuộc Spring/JPA/Feign.
+
+### Inventory correctness
+
+- Hold kiểm tra available và tăng reserved trong một transaction.
+- Repository dùng PESSIMISTIC_WRITE.
+- Version là lớp bảo vệ cho update ngoài đường reserve.
+- Hold/release/expire không tạo physical stock movement.
+- Confirm giảm on-hand và reserved, đồng thời ghi ISSUE trong cùng transaction.
+- Concurrency test kiểm tra 20 thread tranh 5 available mà không over-reserve.
+
+### Reservation lifecycle
+
+- Reservation có UUID, caller-scoped idempotency key, HELD/CONFIRMED/RELEASED/EXPIRED,
+  createdAt, expiresAt và optimistic version.
+- Cùng key/cùng payload trả lại aggregate cũ; payload khác trả conflict.
+- Confirm, release và expire khóa reservation row và không lặp side effect.
+- Expiry worker quét batch, mỗi command khóa lại row nên nhiều instance không
+  release hai lần.
+- `Clock` được inject; test điều khiển thời gian chứng minh hold bỏ quên tự phục hồi.
+- Reconciliation đối chiếu ledger với on-hand và tổng HELD với reserved.
+
+### Data lifecycle
+
+- Flyway migration tạo schema và backfill opening stock movement.
+- Order lưu price snapshot, reservation ID, idempotency key và thời điểm tạo.
+- Product seeder đi qua use case/port thay vì ghi repository trực tiếp.
+
+### Developer experience
+
+- Maven Wrapper và Dockerfile riêng cho từng service.
+- Root Maven reactor chạy build và test cho cả hai service bằng `./mvnw -B verify`.
+- GitHub Actions quality workflow được cấu hình để chạy root verify, kiểm tra diff/Compose và build hai image.
+- H2 profile cho chạy local không cần PostgreSQL.
+- OpenAPI/Swagger và Actuator health/info.
+
+## Khoảng trống mức P1
+
+- Test quan trọng dùng H2, chưa chứng minh PostgreSQL locking/isolation.
+- Không test đường dây OpenFeign thật.
+- Saga orchestration có unit test, nhưng chưa có integration test cho timeout
+  trước/sau commit, compensation failure và ambiguous response.
+- Order chỉ hỗ trợ một sản phẩm.
+- API danh sách chưa phân trang.
+- Chưa có PostgreSQL/Testcontainers integration path trong CI; phần này thuộc Milestone 2.
+- Expiry worker dùng row lock an toàn nhưng chưa dùng PostgreSQL `SKIP LOCKED` để
+  chia batch hiệu quả dưới nhiều instance.
+
+## Khoảng trống mức P2
+
+- Chưa có transactional outbox/Kafka.
+- Chưa có idempotent consumer hoặc dead-letter path.
+- Chưa cấu hình timeout, retry có điều kiện, circuit breaker và bulkhead.
+- Chưa có structured logging, correlation ID, metrics và tracing.
+- Chưa có authentication/authorization.
+- Docker image build với test bị skip và chưa chạy non-root.
+- Production config vẫn bật SQL logging và có credential mặc định.
+
+## Nợ tài liệu và build
+
+- Dockerfile hiện vẫn skip test; root `verify` là quality gate trước Docker build.
+- HANDOFF.md là snapshot bàn giao và có thể lệch với source hiện tại.
+
+## Quyết định tiếp theo
+
+Milestone tiếp theo là integration evidence: Testcontainers PostgreSQL,
+WireMock/MockWebServer, contract test và Docker Compose smoke test tự động. Không
+thêm Kafka/Gateway trước khi các failure path của reservation được chứng minh.
+Xem [roadmap](roadmap.md).

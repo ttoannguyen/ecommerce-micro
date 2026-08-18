@@ -4,6 +4,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -14,17 +16,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class OrderTest {
 
+    private static final UUID RESERVATION_ID = UUID.randomUUID();
+
     private static ReservedProduct reserved(String price) {
-        return new ReservedProduct(1L, "Mechanical keyboard", Money.of(new BigDecimal(price)));
+        return new ReservedProduct(1L, RESERVATION_ID, "Mechanical keyboard",
+                Money.of(new BigDecimal(price)), Instant.now().plusSeconds(900));
     }
 
     @Test
     @DisplayName("total = unit price x quantity")
     void computesTotalFromReservedPrice() {
-        Order order = Order.place(reserved("1200000"), Quantity.of(3));
+        Order order = Order.place(reserved("1200000"), Quantity.of(3), "order-key");
 
         assertThat(order.id()).isNull();
         assertThat(order.productId()).isEqualTo(1L);
+        assertThat(order.reservationId()).isEqualTo(RESERVATION_ID);
+        assertThat(order.idempotencyKey()).isEqualTo("order-key");
         assertThat(order.quantity().value()).isEqualTo(3);
         assertThat(order.totalPrice()).isEqualTo(Money.of(new BigDecimal("3600000")));
         assertThat(order.status()).isEqualTo(OrderStatus.CREATED);
@@ -34,7 +41,7 @@ class OrderTest {
     @Test
     @DisplayName("a new order starts as CREATED")
     void startsInCreatedStatus() {
-        assertThat(Order.place(reserved("1000"), Quantity.of(1)).status())
+        assertThat(Order.place(reserved("1000"), Quantity.of(1), "status-key").status())
                 .isEqualTo(OrderStatus.CREATED);
     }
 }

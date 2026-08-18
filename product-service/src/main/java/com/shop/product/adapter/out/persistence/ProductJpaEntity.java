@@ -29,11 +29,15 @@ public class ProductJpaEntity {
     private BigDecimal price;
 
     @Column(nullable = false)
-    private int stock;
+    private int onHand;
+
+    @Column(nullable = false)
+    private int reserved;
 
     /**
      * Optimistic lock. Every UPDATE becomes:
-     *   UPDATE product SET stock=?, version=v+1 WHERE id=? AND version=v
+     *   UPDATE product SET on_hand=?, reserved=?, version=v+1
+     *   WHERE id=? AND version=v
      * If two transactions both read version=v, only one of them matches a row; the
      * other changes 0 rows and Hibernate raises OptimisticLockingFailure.
      * Reservations take a write lock instead, so this is the backstop for other paths.
@@ -44,16 +48,19 @@ public class ProductJpaEntity {
     protected ProductJpaEntity() {
     }
 
-    public ProductJpaEntity(Long id, String name, BigDecimal price, int stock) {
+    public ProductJpaEntity(Long id, String name, BigDecimal price,
+                            int onHand, int reserved) {
         this.id = id;
         this.name = name;
         this.price = price;
-        this.stock = stock;
+        this.onHand = onHand;
+        this.reserved = reserved;
     }
 
     /** Mutates the managed entity in place so dirty-checking bumps the version. */
-    void changeStock(int stock) {
-        this.stock = stock;
+    void changeBalance(int onHand, int reserved) {
+        this.onHand = onHand;
+        this.reserved = reserved;
     }
 
     public Long getId() {
@@ -68,8 +75,12 @@ public class ProductJpaEntity {
         return price;
     }
 
-    public int getStock() {
-        return stock;
+    public int getOnHand() {
+        return onHand;
+    }
+
+    public int getReserved() {
+        return reserved;
     }
 
     public Long getVersion() {
