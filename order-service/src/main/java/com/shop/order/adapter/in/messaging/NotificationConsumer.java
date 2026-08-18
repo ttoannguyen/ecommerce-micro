@@ -7,12 +7,14 @@ import com.shop.order.adapter.out.messaging.InboxJpaEntity;
 import com.shop.order.adapter.out.messaging.InboxRepository;
 import com.shop.order.adapter.out.messaging.NotificationJpaEntity;
 import com.shop.order.adapter.out.messaging.NotificationRepository;
+import com.shop.order.observability.CorrelationIdContext;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import org.slf4j.MDC;
 
 @Component
 @ConditionalOnProperty(prefix = "messaging.outbox", name = "enabled",
@@ -35,15 +37,27 @@ public class NotificationConsumer {
     @Transactional
     public void consume(String rawEnvelope) {
         EventEnvelope event = parse(rawEnvelope);
-        if (inboxRepository.existsById(event.eventId())) {
-            return;
+        String previous = MDC.get("correlationId");
+        if (event.correlationId() != null && !event.correlationId().isBlank()) {
+            CorrelationIdContext.set(event.correlationId());
         }
+        try {
+            if (inboxRepository.existsById(event.eventId())) {
+                return;
+            }
 
-        inboxRepository.save(new InboxJpaEntity(event.eventId(), event.eventType(), Instant.now()));
-        notificationRepository.save(new NotificationJpaEntity(event.eventId(),
-                Long.valueOf(event.aggregateId()), event.eventType(),
-                "Order " + event.aggregateId() + " phát sinh " + event.eventType(),
-                Instant.now()));
+            inboxRepository.save(new InboxJpaEntity(event.eventId(), event.eventType(), Instant.now()));
+            notificationRepository.save(new NotificationJpaEntity(event.eventId(),
+                    Long.valueOf(event.aggregateId()), event.eventType(),
+                    "Order " + event.aggregateId() + " phát sinh " + event.eventType(),
+                    Instant.now()));
+        } finally {
+            if (previous == null) {
+                CorrelationIdContext.clear();
+            } else {
+                CorrelationIdContext.set(previous);
+            }
+        }
     }
 
     private EventEnvelope parse(String rawEnvelope) {

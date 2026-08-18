@@ -94,7 +94,11 @@ class Milestone2IntegrationTest {
                         "messaging.outbox.enabled=true",
                         "messaging.outbox.poll-interval-ms=250",
                         "messaging.topic.orders=order-events",
-                        "messaging.consumer.group=integration-notification")
+                        "messaging.consumer.group=integration-notification",
+                        "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
+                        "management.endpoint.health.probes.enabled=true",
+                        "management.health.livenessstate.enabled=true",
+                        "management.health.readinessstate.enabled=true")
                 .run();
 
         int orderPort = orderContext.getEnvironment().getProperty("local.server.port", Integer.class);
@@ -149,16 +153,20 @@ class Milestone2IntegrationTest {
     @Order(2)
     void orderUsesOpenFeignAndOrderIdempotencyAcrossBothServices() throws Exception {
         String key = "integration-order-" + UUID.randomUUID();
+        String correlationId = "corr-" + UUID.randomUUID();
         String body = "{\"productId\":2,\"quantity\":3}";
 
         HttpResponse<String> first = send(request(orderBaseUrl + "/orders")
                 .header("Idempotency-Key", key)
+                .header("X-Correlation-Id", correlationId)
                 .POST(HttpRequest.BodyPublishers.ofString(body)));
         HttpResponse<String> replay = send(request(orderBaseUrl + "/orders")
                 .header("Idempotency-Key", key)
                 .POST(HttpRequest.BodyPublishers.ofString(body)));
 
         assertThat(first.statusCode()).isEqualTo(201);
+        assertThat(first.headers().firstValue("X-Correlation-Id").orElseThrow())
+                .isEqualTo(correlationId);
         assertThat(replay.statusCode()).isEqualTo(201);
         JsonNode created = json.readTree(first.body());
         JsonNode repeated = json.readTree(replay.body());
@@ -174,6 +182,8 @@ class Milestone2IntegrationTest {
         assertThat(conflict.statusCode()).isEqualTo(409);
         assertThat(json.readTree(conflict.body()).get("code").asText())
                 .isEqualTo("IDEMPOTENCY_CONFLICT");
+        assertThat(count("select count(*) from outbox_events where correlation_id is not null"))
+                .isEqualTo(1);
     }
 
     @Test
@@ -264,6 +274,21 @@ class Milestone2IntegrationTest {
         Thread.sleep(1500);
         assertThat(count("select count(*) from notification_log")).isEqualTo(6);
         assertThat(count("select count(*) from inbox_events")).isEqualTo(6);
+        assertThat(count("select count(*) from outbox_events where correlation_id is not null"))
+                .isEqualTo(6);
+    }
+
+    @Test
+    @Order(7)
+    void exposesSeparateLivenessReadinessAndPrometheusMetrics() throws Exception {
+        assertThat(send(request(orderBaseUrl + "/actuator/health/liveness").GET()).statusCode())
+                .isEqualTo(200);
+        assertThat(send(request(orderBaseUrl + "/actuator/health/readiness").GET()).statusCode())
+                .isEqualTo(200);
+        HttpResponse<String> metrics = send(request(orderBaseUrl + "/actuator/prometheus").GET());
+        assertThat(metrics.statusCode()).isEqualTo(200);
+        assertThat(metrics.body()).contains("http_server_requests_seconds");
+        assertThat(metrics.body()).contains("messaging_outbox_events");
     }
 
     private static long count(String sql) throws Exception {

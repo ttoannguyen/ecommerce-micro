@@ -10,5 +10,6 @@ public record EventEnvelope(
         String aggregateId,
         Instant occurredAt,
         int schemaVersion,
+        String correlationId,
         String payload) {
 }

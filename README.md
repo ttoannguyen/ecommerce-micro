@@ -1,7 +1,9 @@
 # ecommerce-micro — Order & Inventory Platform
 
 Microservice học tập. 2 service, DB riêng mỗi service, gọi nhau qua REST
-(OpenFeign) và phát event order qua transactional outbox/Kafka.
+(OpenFeign) và phát event order qua transactional outbox/Kafka. Luồng outbound
+có timeout, retry idempotent, circuit breaker và bulkhead; Actuator expose
+metrics/Prometheus và health probes.
 
 ```
 Client ──POST /orders/batch──► Order Service ──POST /reservations/batch──► Product Service

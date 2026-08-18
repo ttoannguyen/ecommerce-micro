@@ -74,11 +74,15 @@ orderdb                             productdb
 - H2 profile cho chạy local không cần PostgreSQL.
 - Module `integration-tests` dùng Testcontainers 2.0.5, PostgreSQL 16 và chạy hai
   application context với port động.
-- Order service có transactional outbox v5, Kafka publisher retry/backoff,
+- Order service có transactional outbox v6, Kafka publisher retry/backoff,
   inbox deduplication và notification log; Compose chạy Kafka KRaft.
 - Integration test chứng minh Flyway PostgreSQL, reservation replay, order replay,
   idempotency conflict, insufficient stock và batch rollback qua OpenFeign.
-- OpenAPI/Swagger và Actuator health/info.
+- OpenAPI/Swagger, Actuator health/info/metrics/prometheus, liveness/readiness
+  probe, Prometheus outbox backlog gauge và Micrometer tracing bridge.
+- Feign có timeout; product call có retry bounded, circuit breaker và bulkhead.
+- Correlation ID được trả về qua REST, truyền qua Feign và lưu trong outbox/event;
+  structured request logs đưa correlation ID vào MDC.
 
 ## Khoảng trống mức P1
 
@@ -95,8 +99,9 @@ orderdb                             productdb
 
 - Chưa có fault-injection test cho crash giữa DB commit và Kafka publish.
 - Chưa có endpoint vận hành để inspect/replay DLT có audit.
-- Chưa cấu hình timeout, retry có điều kiện, circuit breaker và bulkhead.
-- Chưa có structured logging, correlation ID, metrics và tracing.
+- Chưa có fault-injection test để đo circuit breaker dưới outage dài.
+- Chưa có collector/dashboard production cho trace span; hiện application đã tạo
+  trace context và expose metrics để nối vào hạ tầng observability.
 - Chưa có authentication/authorization.
 - Docker image build với test bị skip và chưa chạy non-root.
 - Production config vẫn bật SQL logging và có credential mặc định.

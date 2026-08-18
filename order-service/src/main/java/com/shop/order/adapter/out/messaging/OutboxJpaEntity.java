@@ -35,6 +35,9 @@ public class OutboxJpaEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String payload;
 
+    @Column(length = 128)
+    private String correlationId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private OutboxStatus status;
@@ -55,7 +58,7 @@ public class OutboxJpaEntity {
 
     public OutboxJpaEntity(UUID eventId, String eventType, String aggregateType,
                            String aggregateId, Instant occurredAt, int schemaVersion,
-                           String payload, OutboxStatus status, int attempts,
+                           String payload, String correlationId, OutboxStatus status, int attempts,
                            Instant nextAttemptAt, String lastError, Instant publishedAt) {
         this.eventId = eventId;
         this.eventType = eventType;
@@ -64,6 +67,7 @@ public class OutboxJpaEntity {
         this.occurredAt = occurredAt;
         this.schemaVersion = schemaVersion;
         this.payload = payload;
+        this.correlationId = correlationId;
         this.status = status;
         this.attempts = attempts;
         this.nextAttemptAt = nextAttemptAt;
@@ -97,4 +101,5 @@ public class OutboxJpaEntity {
     public Instant getOccurredAt() { return occurredAt; }
     public int getSchemaVersion() { return schemaVersion; }
     public String getPayload() { return payload; }
+    public String getCorrelationId() { return correlationId; }
 }

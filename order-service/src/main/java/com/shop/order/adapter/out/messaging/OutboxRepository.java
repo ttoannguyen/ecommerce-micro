@@ -17,4 +17,6 @@ public interface OutboxRepository extends JpaRepository<OutboxJpaEntity, java.ut
             + "and e.nextAttemptAt <= :now order by e.occurredAt")
     List<OutboxJpaEntity> findReady(Collection<OutboxStatus> statuses, Instant now,
                                     Pageable pageable);
+
+    long countByStatus(OutboxStatus status);
 }

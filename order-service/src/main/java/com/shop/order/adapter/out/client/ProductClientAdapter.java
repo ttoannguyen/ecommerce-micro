@@ -8,6 +8,9 @@ import com.shop.order.domain.model.ReservedProduct;
 import com.shop.order.domain.model.OrderItemDraft;
 import com.shop.order.domain.port.out.ReserveStockPort;
 import feign.FeignException;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -27,6 +30,9 @@ public class ProductClientAdapter implements ReserveStockPort {
     }
 
     @Override
+    @CircuitBreaker(name = "productService")
+    @Bulkhead(name = "productService", type = Bulkhead.Type.SEMAPHORE)
+    @Retry(name = "productService")
     public ReservedProduct reserve(Long productId, Quantity quantity, String idempotencyKey) {
         try {
             ReservationResponse reserved =
@@ -52,6 +58,9 @@ public class ProductClientAdapter implements ReserveStockPort {
     }
 
     @Override
+    @CircuitBreaker(name = "productService")
+    @Bulkhead(name = "productService", type = Bulkhead.Type.SEMAPHORE)
+    @Retry(name = "productService")
     public List<ReservedProduct> reserve(List<OrderItemDraft> items, String idempotencyKey) {
         try {
             BatchReservationResponse response = client.reserveBatch(
@@ -74,6 +83,9 @@ public class ProductClientAdapter implements ReserveStockPort {
     }
 
     @Override
+    @CircuitBreaker(name = "productService")
+    @Bulkhead(name = "productService", type = Bulkhead.Type.SEMAPHORE)
+    @Retry(name = "productService")
     public void release(UUID reservationId) {
         client.release(reservationId);
     }

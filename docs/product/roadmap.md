@@ -97,7 +97,9 @@ Implementation plan: [Transactional messaging](../implementation-plans/milestone
 inbox deduplication, notification side effect và DLT config. Fault injection
 crash/replay DLT là phần hardening tiếp theo.
 
-## Milestone 5 — Resilience và observability
+## Milestone 5 — Resilience và observability (completed)
+
+Implementation plan: [Resilience và observability](../implementation-plans/milestone-5-resilience-observability.md).
 
 - Connect/read timeout rõ ràng.
 - Retry chỉ cho operation idempotent.
@@ -107,6 +109,11 @@ crash/replay DLT là phần hardening tiếp theo.
 
 Hoàn thành khi truy vết được một order xuyên REST/database/event và dashboard
 hiển thị throughput, error rate, latency cùng backlog.
+
+Đã có timeout Feign, retry có điều kiện cho operation idempotent, circuit breaker,
+bulkhead, correlation ID xuyên REST/Feign/outbox/Kafka, structured logs,
+Prometheus/tracing bridge và probe liveness/readiness. Fault injection và DLT
+replay audit vẫn là hardening.
 
 ## Milestone 6 — Security, deployment và performance
 

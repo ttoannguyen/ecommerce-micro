@@ -11,6 +11,7 @@ import com.shop.order.adapter.out.messaging.OutboxStatus;
 import com.shop.order.domain.model.Order;
 import com.shop.order.domain.port.out.LoadOrderPort;
 import com.shop.order.domain.port.out.SaveOrderPort;
+import com.shop.order.observability.CorrelationIdContext;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,11 +95,13 @@ public class OrderPersistenceAdapter implements SaveOrderPort, LoadOrderPort {
                                      Order order) {
         Instant occurredAt = Instant.now();
         String payload = writePayload(OrderEventPayload.from(order));
+        String correlationId = CorrelationIdContext.currentOrNull();
         EventEnvelope envelope = new EventEnvelope(UUID.randomUUID(), eventType.name(),
-                "Order", entity.getId().toString(), occurredAt, 1, payload);
+                "Order", entity.getId().toString(), occurredAt, 2, correlationId, payload);
         return new OutboxJpaEntity(envelope.eventId(), envelope.eventType(),
                 envelope.aggregateType(), envelope.aggregateId(), envelope.occurredAt(),
-                envelope.schemaVersion(), writePayload(envelope), OutboxStatus.PENDING, 0,
+                envelope.schemaVersion(), writePayload(envelope), correlationId,
+                OutboxStatus.PENDING, 0,
                 occurredAt, null, null);
     }
 

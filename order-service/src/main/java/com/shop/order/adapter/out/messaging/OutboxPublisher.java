@@ -10,6 +10,9 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.messaging.Message;
+import org.springframework.messaging.support.MessageBuilder;
 
 @Component
 @ConditionalOnProperty(prefix = "messaging.outbox", name = "enabled",
@@ -39,7 +42,12 @@ public class OutboxPublisher {
 
     private void publish(OutboxJpaEntity event) {
         try {
-            kafkaTemplate.send(topic, event.getAggregateId(), event.getPayload())
+            Message<String> message = MessageBuilder.withPayload(event.getPayload())
+                    .setHeader(KafkaHeaders.TOPIC, topic)
+                    .setHeader(KafkaHeaders.KEY, event.getAggregateId())
+                    .setHeader("X-Correlation-Id", event.getCorrelationId())
+                    .build();
+            kafkaTemplate.send(message)
                     .get(5, TimeUnit.SECONDS);
             store.markPublished(event.getEventId(), Instant.now());
         } catch (Exception failure) {
