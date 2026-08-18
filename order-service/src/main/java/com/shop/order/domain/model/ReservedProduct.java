@@ -17,14 +17,21 @@ public final class ReservedProduct {
     private final UUID reservationId;
     private final String name;
     private final Money price;
+    private final int quantity;
     private final Instant expiresAt;
 
     public ReservedProduct(Long productId, UUID reservationId, String name,
                            Money price, Instant expiresAt) {
+        this(productId, reservationId, name, price, 1, expiresAt);
+    }
+
+    public ReservedProduct(Long productId, UUID reservationId, String name,
+                           Money price, int quantity, Instant expiresAt) {
         this.productId = productId;
         this.reservationId = reservationId;
         this.name = name;
         this.price = price;
+        this.quantity = quantity;
         this.expiresAt = expiresAt;
     }
 
@@ -42,6 +49,10 @@ public final class ReservedProduct {
 
     public Money price() {
         return price;
+    }
+
+    public int quantity() {
+        return quantity;
     }
 
     public Instant expiresAt() {

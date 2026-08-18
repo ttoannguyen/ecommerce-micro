@@ -13,28 +13,40 @@ import java.util.Optional;
 public class OrderPersistenceAdapter implements SaveOrderPort, LoadOrderPort {
 
     private final SpringDataOrderRepository repository;
+    private final SpringDataOrderItemRepository itemRepository;
 
-    public OrderPersistenceAdapter(SpringDataOrderRepository repository) {
+    public OrderPersistenceAdapter(SpringDataOrderRepository repository,
+                                   SpringDataOrderItemRepository itemRepository) {
         this.repository = repository;
+        this.itemRepository = itemRepository;
     }
 
     @Override
     public Order save(Order order) {
-        return OrderMapper.toDomain(repository.saveAndFlush(OrderMapper.toEntity(order)));
+        OrderJpaEntity entity = repository.saveAndFlush(OrderMapper.toEntity(order));
+        itemRepository.saveAll(order.items().stream()
+                .map(item -> OrderMapper.toItemEntity(entity.getId(), order.items().indexOf(item), item))
+                .toList());
+        return OrderMapper.toDomain(entity, itemRepository.findByOrderIdOrderByLineNumber(entity.getId()));
     }
 
     @Override
     public List<Order> findAll() {
-        return repository.findAll().stream().map(OrderMapper::toDomain).toList();
+        return repository.findAll().stream()
+                .map(entity -> OrderMapper.toDomain(entity,
+                        itemRepository.findByOrderIdOrderByLineNumber(entity.getId())))
+                .toList();
     }
 
     @Override
     public Optional<Order> findById(Long id) {
-        return repository.findById(id).map(OrderMapper::toDomain);
+        return repository.findById(id).map(entity -> OrderMapper.toDomain(entity,
+                itemRepository.findByOrderIdOrderByLineNumber(entity.getId())));
     }
 
     @Override
     public Optional<Order> findByIdempotencyKey(String idempotencyKey) {
-        return repository.findByIdempotencyKey(idempotencyKey).map(OrderMapper::toDomain);
+        return repository.findByIdempotencyKey(idempotencyKey).map(entity -> OrderMapper.toDomain(entity,
+                itemRepository.findByOrderIdOrderByLineNumber(entity.getId())));
     }
 }

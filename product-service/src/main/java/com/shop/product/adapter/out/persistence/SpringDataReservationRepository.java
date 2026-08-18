@@ -15,8 +15,8 @@ import java.util.UUID;
 
 interface SpringDataReservationRepository extends JpaRepository<ReservationJpaEntity, UUID> {
 
-    Optional<ReservationJpaEntity> findByCallerAndIdempotencyKey(
-            String caller, String idempotencyKey);
+    Optional<ReservationJpaEntity> findByCallerAndIdempotencyKeyAndProductId(
+            String caller, String idempotencyKey, Long productId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from ReservationJpaEntity r where r.id = :id")

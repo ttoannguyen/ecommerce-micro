@@ -3,7 +3,7 @@
 Microservice học tập. 2 service, DB riêng mỗi service, gọi nhau qua REST (OpenFeign).
 
 ```
-Client ──POST /orders──► Order Service ──POST /products/{id}/reservations──► Product Service
+Client ──POST /orders/batch──► Order Service ──POST /reservations/batch──► Product Service
    (8082)                    │            (Feign)                              │  (8081)
                           orderdb (Postgres 5433)                     productdb (Postgres 5432)
 ```
@@ -98,11 +98,17 @@ Chờ 4 container lên: `postgres-product`, `postgres-order`, `product-service`,
 curl http://localhost:8081/products
 curl http://localhost:8081/products/1
 
-# Đặt hàng idempotent -> Order gọi Product tạo hold và lưu reservationId
+# Đặt hàng một SKU (API tương thích)
 curl -X POST http://localhost:8082/orders \
   -H "Idempotency-Key: postman-order-001" \
   -H "Content-Type: application/json" \
   -d '{"productId":1,"quantity":2}'
+
+# Đặt order nhiều sản phẩm: toàn bộ reservation thành công hoặc rollback
+curl -X POST http://localhost:8082/orders/batch \
+  -H "Idempotency-Key: postman-order-batch-001" \
+  -H "Content-Type: application/json" \
+  -d '{"items":[{"productId":1,"quantity":2},{"productId":2,"quantity":1}]}'
 
 # Xem đơn
 curl http://localhost:8082/orders

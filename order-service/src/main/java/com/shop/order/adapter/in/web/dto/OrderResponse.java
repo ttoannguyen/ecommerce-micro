@@ -4,6 +4,7 @@ import com.shop.order.domain.model.Order;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /** HTTP view of an order. Keeps the aggregate away from the wire format. */
@@ -14,7 +15,8 @@ public record OrderResponse(
         int quantity,
         BigDecimal totalPrice,
         String status,
-        Instant createdAt) {
+        Instant createdAt,
+        List<OrderItemResponse> items) {
 
     public static OrderResponse from(Order order) {
         return new OrderResponse(
@@ -24,6 +26,7 @@ public record OrderResponse(
                 order.quantity().value(),
                 order.totalPrice().amount(),
                 order.status().name(),
-                order.createdAt());
+                order.createdAt(),
+                order.items().stream().map(OrderItemResponse::from).toList());
     }
 }

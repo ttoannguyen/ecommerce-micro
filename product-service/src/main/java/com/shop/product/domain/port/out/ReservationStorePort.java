@@ -8,7 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ReservationStorePort {
-    Optional<Reservation> findByCallerAndKey(String caller, String idempotencyKey);
+    Optional<Reservation> findByCallerKeyAndProduct(String caller, String idempotencyKey,
+                                                     Long productId);
     Optional<Reservation> findById(UUID id);
     Optional<Reservation> findByIdForUpdate(UUID id);
     Reservation save(Reservation reservation);

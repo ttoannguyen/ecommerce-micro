@@ -1,11 +1,14 @@
 package com.shop.order.adapter.in.web;
 
 import com.shop.order.adapter.in.web.dto.CreateOrderRequest;
+import com.shop.order.adapter.in.web.dto.BatchCreateOrderRequest;
 import com.shop.order.adapter.in.web.dto.OrderResponse;
 import com.shop.order.domain.model.Order;
 import com.shop.order.domain.port.in.FindOrdersUseCase;
 import com.shop.order.domain.port.in.PlaceOrderCommand;
 import com.shop.order.domain.port.in.PlaceOrderUseCase;
+import com.shop.order.domain.model.OrderItemDraft;
+import com.shop.order.domain.model.Quantity;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -39,6 +42,18 @@ public class OrderController {
         Order order = placeOrderUseCase.placeOrder(
                 new PlaceOrderCommand(
                         request.productId(), request.quantity(), idempotencyKey));
+        return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
+    }
+
+    @PostMapping("/batch")
+    public ResponseEntity<OrderResponse> createBatch(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @Valid @RequestBody BatchCreateOrderRequest request) {
+        Order order = placeOrderUseCase.placeOrder(new PlaceOrderCommand(
+                request.items().stream()
+                        .map(item -> new OrderItemDraft(item.productId(), Quantity.of(item.quantity())))
+                        .toList(),
+                idempotencyKey));
         return ResponseEntity.status(HttpStatus.CREATED).body(OrderResponse.from(order));
     }
 

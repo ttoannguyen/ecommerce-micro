@@ -7,6 +7,9 @@ import com.shop.product.ProductServiceApplication;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.MethodOrderer;
+import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.http.HttpHeaders;
@@ -26,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Milestone 2 black-box test: two real PostgreSQL databases, two real Spring
  * applications and the order -> product OpenFeign call over HTTP.
  */
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class Milestone2IntegrationTest {
 
     static final PostgreSQLContainer<?> productDb = postgres("productdb");
@@ -95,6 +99,7 @@ class Milestone2IntegrationTest {
     }
 
     @Test
+    @Order(1)
     void productReservationUsesPostgresAndIsIdempotent() throws Exception {
         String key = "integration-product-" + UUID.randomUUID();
         String body = "{\"quantity\":2}";
@@ -123,6 +128,7 @@ class Milestone2IntegrationTest {
     }
 
     @Test
+    @Order(2)
     void orderUsesOpenFeignAndOrderIdempotencyAcrossBothServices() throws Exception {
         String key = "integration-order-" + UUID.randomUUID();
         String body = "{\"productId\":2,\"quantity\":3}";
@@ -153,6 +159,7 @@ class Milestone2IntegrationTest {
     }
 
     @Test
+    @Order(3)
     void insufficientStockIsRejectedByProductAndDoesNotCreateOrder() throws Exception {
         String key = "integration-insufficient-" + UUID.randomUUID();
         HttpResponse<String> response = send(request(orderBaseUrl + "/orders")
@@ -162,6 +169,35 @@ class Milestone2IntegrationTest {
         assertThat(response.statusCode()).isEqualTo(409);
         assertThat(json.readTree(response.body()).get("code").asText())
                 .isEqualTo("INSUFFICIENT_STOCK");
+        assertThat(get(productBaseUrl + "/products/3").get("reserved").asInt()).isZero();
+    }
+
+    @Test
+    @Order(4)
+    void batchOrderReservesAllLinesOrNothing() throws Exception {
+        String key = "integration-batch-" + UUID.randomUUID();
+        HttpResponse<String> created = send(request(orderBaseUrl + "/orders/batch")
+                .header("Idempotency-Key", key)
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        "{\"items\":[{\"productId\":1,\"quantity\":2},"
+                                + "{\"productId\":2,\"quantity\":4}]}")));
+
+        assertThat(created.statusCode()).isEqualTo(201);
+        JsonNode order = json.readTree(created.body());
+        assertThat(order.get("status").asText()).isEqualTo("RESERVED");
+        assertThat(order.get("items")).hasSize(2);
+        assertThat(get(productBaseUrl + "/products/1").get("reserved").asInt()).isEqualTo(4);
+        assertThat(get(productBaseUrl + "/products/2").get("reserved").asInt()).isEqualTo(7);
+
+        String failingKey = "integration-batch-fail-" + UUID.randomUUID();
+        HttpResponse<String> failed = send(request(orderBaseUrl + "/orders/batch")
+                .header("Idempotency-Key", failingKey)
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        "{\"items\":[{\"productId\":1,\"quantity\":1},"
+                                + "{\"productId\":3,\"quantity\":99}]}")));
+
+        assertThat(failed.statusCode()).isEqualTo(409);
+        assertThat(get(productBaseUrl + "/products/1").get("reserved").asInt()).isEqualTo(4);
         assertThat(get(productBaseUrl + "/products/3").get("reserved").asInt()).isZero();
     }
 

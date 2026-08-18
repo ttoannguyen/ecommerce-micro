@@ -15,8 +15,8 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "reservation", uniqueConstraints =
-        @UniqueConstraint(name = "uq_reservation_caller_key",
-                columnNames = {"caller", "idempotency_key"}))
+        @UniqueConstraint(name = "uq_reservation_caller_key_product",
+                columnNames = {"caller", "idempotency_key", "product_id"}))
 public class ReservationJpaEntity {
 
     @Id

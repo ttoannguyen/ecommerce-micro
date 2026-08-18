@@ -14,6 +14,7 @@ một tính năng chưa có như thể nó đã chạy.
 | [Milestone 0 implementation plan](implementation-plans/milestone-0-build-ci.md) | Root build và CI được triển khai, kiểm chứng thế nào? |
 | [Milestone 1 implementation plan](implementation-plans/milestone-1-reservation-lifecycle.md) | Reservation lifecycle, idempotency và inventory balance được triển khai thế nào? |
 | [Milestone 2 implementation plan](implementation-plans/milestone-2-integration-readiness.md) | PostgreSQL thật, OpenFeign và cross-service integration được kiểm chứng thế nào? |
+| [Milestone 3 implementation plan](implementation-plans/milestone-3-order-lifecycle.md) | Multi-SKU order, atomic reservation và order state machine được triển khai thế nào? |
 | [Prompt triển khai Milestone 0](prompts/implement-milestone-0.md) | Giao trọn task Milestone 0 cho coding agent |
 | [Quy tắc nhánh và pull request](development/branching-strategy.md) | main, branch naming, PR, merge và GitHub ruleset |
 | [Kiến trúc](architecture.md) | Service, dữ liệu và transaction được phân ranh giới thế nào? |

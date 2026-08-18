@@ -10,7 +10,8 @@
 Dự án đã có reservation identity, TTL, idempotency và stock ledger. Hold không
 còn bị mô hình như xuất kho vật lý: Product tách on-hand, reserved và available;
 Order lưu reference tới reservation. Milestone 2 đã bổ sung evidence trên
-PostgreSQL/OpenFeign thật; khoảng trống tiếp theo là các failure path nâng cao.
+PostgreSQL/OpenFeign thật. Milestone 3 hiện đã có multi-SKU batch reservation
+và order line snapshot; phần còn lại là payment/cancel transition history.
 
 ## Kiến trúc đang chạy
 
@@ -61,6 +62,8 @@ orderdb                             productdb
 
 - Flyway migration tạo schema và backfill opening stock movement.
 - Order lưu price snapshot, reservation ID, idempotency key và thời điểm tạo.
+- Order batch lưu từng line trong `order_items`, gồm tên/giá snapshot, quantity
+  và reservation ID.
 - Product seeder đi qua use case/port thay vì ghi repository trực tiếp.
 
 ### Developer experience
@@ -72,7 +75,7 @@ orderdb                             productdb
 - Module `integration-tests` dùng Testcontainers 2.0.5, PostgreSQL 16 và chạy hai
   application context với port động.
 - Integration test chứng minh Flyway PostgreSQL, reservation replay, order replay,
-  idempotency conflict và insufficient stock qua OpenFeign.
+  idempotency conflict, insufficient stock và batch rollback qua OpenFeign.
 - OpenAPI/Swagger và Actuator health/info.
 
 ## Khoảng trống mức P1
@@ -80,7 +83,8 @@ orderdb                             productdb
 - Chưa có stress test PostgreSQL locking/isolation ở quy mô lớn.
 - Saga orchestration có unit test, nhưng chưa có integration test cho timeout
   trước/sau commit, compensation failure và ambiguous response.
-- Order chỉ hỗ trợ một sản phẩm.
+- Order batch đã hỗ trợ nhiều sản phẩm; endpoint legacy `/orders` vẫn giữ một SKU.
+- Chưa có API payment/cancel và transition history.
 - API danh sách chưa phân trang.
 - Expiry worker dùng row lock an toàn nhưng chưa dùng PostgreSQL `SKIP LOCKED` để
   chia batch hiệu quả dưới nhiều instance.
@@ -102,7 +106,7 @@ orderdb                             productdb
 
 ## Quyết định tiếp theo
 
-Milestone tiếp theo là realistic order lifecycle: nhiều line, state machine và
-multi-SKU reservation. Không thêm Kafka/Gateway trước khi các failure path của
-reservation được chứng minh.
+Milestone hiện tại là realistic order lifecycle: hoàn thiện payment/cancel,
+transition history, pagination và concurrency test cho nhiều line. Không thêm
+Kafka/Gateway trước khi các failure path của reservation được chứng minh.
 Xem [roadmap](roadmap.md).

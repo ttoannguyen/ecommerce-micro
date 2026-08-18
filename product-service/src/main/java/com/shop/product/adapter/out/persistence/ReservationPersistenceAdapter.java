@@ -21,8 +21,9 @@ public class ReservationPersistenceAdapter implements ReservationStorePort {
     }
 
     @Override
-    public Optional<Reservation> findByCallerAndKey(String caller, String key) {
-        return repository.findByCallerAndIdempotencyKey(caller, key)
+    public Optional<Reservation> findByCallerKeyAndProduct(String caller, String key,
+                                                            Long productId) {
+        return repository.findByCallerAndIdempotencyKeyAndProductId(caller, key, productId)
                 .map(ReservationMapper::toDomain);
     }
 

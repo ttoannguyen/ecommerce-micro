@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.UUID;
+import java.util.List;
 
 /**
  * Calls product-service over HTTP. Order never touches productdb — it has to ask.
@@ -23,6 +24,12 @@ public interface ProductClient {
             @RequestHeader("Idempotency-Key") String idempotencyKey,
             @RequestHeader("X-Caller-Id") String caller,
             @RequestBody ReserveStockRequest request);
+
+    @PostMapping("/reservations/batch")
+    BatchReservationResponse reserveBatch(
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
+            @RequestHeader("X-Caller-Id") String caller,
+            @RequestBody BatchReserveStockRequest request);
 
     @DeleteMapping("/reservations/{id}")
     void release(@PathVariable("id") UUID reservationId);

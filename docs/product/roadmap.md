@@ -65,13 +65,19 @@ Milestone 5; Milestone 2 đã chứng minh database, HTTP boundary và các path
 
 Hoàn thành: CI chạy được integration path thật mà không cần test tay.
 
-## Milestone 3 — Order lifecycle
+## Milestone 3 — Order lifecycle (in progress)
+
+Implementation plan: [Order lifecycle](../implementation-plans/milestone-3-order-lifecycle.md).
 
 - Nhiều OrderItem và snapshot từng line.
 - State machine cho order.
 - Reserve nhiều SKU nguyên tử.
 - Lock SKU theo thứ tự ổn định để giảm deadlock.
 - Optimistic version, pagination và transition history.
+
+Phần đầu đã có: `POST /orders/batch`, batch hold xuyên OpenFeign và rollback
+transaction khi một SKU không đủ hàng. Pagination, transition history và các
+command thanh toán/hủy sẽ hoàn thiện trong phần còn lại của milestone.
 
 Hoàn thành khi không có partial hold và confirm/cancel đồng thời chỉ có một
 transition hợp lệ.

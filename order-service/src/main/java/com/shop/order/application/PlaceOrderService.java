@@ -3,6 +3,7 @@ package com.shop.order.application;
 import com.shop.order.domain.model.InsufficientStockException;
 import com.shop.order.domain.model.IdempotencyConflictException;
 import com.shop.order.domain.model.Order;
+import com.shop.order.domain.model.OrderItemDraft;
 import com.shop.order.domain.model.Quantity;
 import com.shop.order.domain.model.ReservedProduct;
 import com.shop.order.domain.port.in.PlaceOrderCommand;
@@ -14,6 +15,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DataIntegrityViolationException;
+
+import java.util.List;
 
 /**
  * A two-step saga across two databases.
@@ -47,31 +50,30 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             return replay(command, replay);
         }
 
-        Quantity quantity = Quantity.of(command.quantity());
+        validateItems(command.items());
 
-        // Step 1: product-service creates an expiring hold, or refuses.
-        ReservedProduct reserved = reserve(command.productId(), quantity, key);
+        // Step 1: product-service creates every expiring hold in one transaction, or refuses.
+        List<ReservedProduct> reserved = reserve(command.items(), key);
 
         // Step 2: record the reservation reference. If this fails, release the hold.
         try {
-            return saveOrderPort.save(Order.place(reserved, quantity, key));
+            return saveOrderPort.save(Order.place(reserved, key));
         } catch (DataIntegrityViolationException concurrentReplay) {
             Order winner = loadOrderPort.findByIdempotencyKey(key).orElse(null);
-            if (winner != null && winner.matchesRequest(
-                    command.productId(), command.quantity())) {
+            if (winner != null && winner.matchesRequest(command.items())) {
                 return winner;
             }
-            compensate(reserved.reservationId(), concurrentReplay);
+            compensate(reserved, concurrentReplay);
             throw concurrentReplay;
         } catch (RuntimeException saveFailed) {
-            compensate(reserved.reservationId(), saveFailed);
+            compensate(reserved, saveFailed);
             throw saveFailed;
         }
     }
 
-    private ReservedProduct reserve(Long productId, Quantity quantity, String key) {
+    private List<ReservedProduct> reserve(List<OrderItemDraft> items, String key) {
         try {
-            return reserveStockPort.reserve(productId, quantity, key);
+            return reserveStockPort.reserve(items, key);
         } catch (InsufficientStockException refused) {
             // A clean "no". product-service decided and committed nothing. Safe to give up.
             throw refused;
@@ -81,20 +83,21 @@ public class PlaceOrderService implements PlaceOrderUseCase {
             // without the UUID, but retrying this order with the same key returns the same
             // reservation; if nobody retries, its TTL is the recovery path.
             log.error("Reservation outcome UNKNOWN; retry with the same idempotency key: "
-                            + "productId={} quantity={}",
-                    productId, quantity.value(), ambiguous);
+                            + "items={}", items, ambiguous);
             throw ambiguous;
         }
     }
 
-    private void compensate(java.util.UUID reservationId, RuntimeException cause) {
-        try {
-            reserveStockPort.release(reservationId);
-        } catch (RuntimeException releaseFailed) {
-            // The expiry worker is the backstop when compensation itself fails.
-            log.error("Compensation failed, reservation remains HELD: reservationId={}",
-                    reservationId, releaseFailed);
-            cause.addSuppressed(releaseFailed);
+    private void compensate(List<ReservedProduct> reserved, RuntimeException cause) {
+        for (ReservedProduct item : reserved) {
+            try {
+                reserveStockPort.release(item.reservationId());
+            } catch (RuntimeException releaseFailed) {
+                // The expiry worker is the backstop when compensation itself fails.
+                log.error("Compensation failed, reservation remains HELD: reservationId={}",
+                        item.reservationId(), releaseFailed);
+                cause.addSuppressed(releaseFailed);
+            }
         }
     }
 
@@ -106,10 +109,23 @@ public class PlaceOrderService implements PlaceOrderUseCase {
     }
 
     private static Order replay(PlaceOrderCommand command, Order existing) {
-        if (!existing.matchesRequest(command.productId(), command.quantity())) {
+        if (!existing.matchesRequest(command.items())) {
             throw new IdempotencyConflictException(
                     "Idempotency-Key đã được dùng với payload khác");
         }
         return existing;
+    }
+
+    private static void validateItems(List<OrderItemDraft> items) {
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("order phải có ít nhất một item");
+        }
+        if (items.stream().anyMatch(item -> item == null || item.productId() == null
+                || item.quantity() == null || item.quantity().value() <= 0)) {
+            throw new IllegalArgumentException("mỗi item phải có productId và quantity > 0");
+        }
+        if (items.stream().map(OrderItemDraft::productId).distinct().count() != items.size()) {
+            throw new IllegalArgumentException("một order không được lặp productId");
+        }
     }
 }

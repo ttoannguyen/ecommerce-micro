@@ -4,11 +4,14 @@ import com.shop.product.domain.model.IdempotencyConflictException;
 import com.shop.product.domain.model.Product;
 import com.shop.product.domain.model.ProductNotFoundException;
 import com.shop.product.domain.model.Reservation;
+import com.shop.product.domain.model.ReservationBatchDetails;
 import com.shop.product.domain.model.ReservationDetails;
 import com.shop.product.domain.model.ReservationNotFoundException;
 import com.shop.product.domain.model.ReservationStatus;
 import com.shop.product.domain.model.StockChange;
 import com.shop.product.domain.port.in.HoldReservationCommand;
+import com.shop.product.domain.port.in.HoldReservationBatchCommand;
+import com.shop.product.domain.port.in.HoldReservationLine;
 import com.shop.product.domain.port.in.ReservationUseCase;
 import com.shop.product.domain.port.out.LoadProductPort;
 import com.shop.product.domain.port.out.ReservationStorePort;
@@ -20,6 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -49,28 +56,44 @@ public class ReservationLifecycleService implements ReservationUseCase {
     @Transactional
     public ReservationDetails hold(HoldReservationCommand command) {
         validate(command);
-        Optional<Reservation> replay = reservationStore.findByCallerAndKey(
-                command.caller().trim(), command.idempotencyKey().trim());
+        return holdWithinTransaction(command.productId(), command.quantity(),
+                command.caller(), command.idempotencyKey());
+    }
+
+    @Override
+    @Transactional
+    public ReservationBatchDetails holdBatch(HoldReservationBatchCommand command) {
+        validateBatch(command);
+        List<HoldReservationLine> ordered = command.lines().stream()
+                .sorted(Comparator.comparing(HoldReservationLine::productId))
+                .toList();
+        List<ReservationDetails> reservations = new ArrayList<>();
+        for (HoldReservationLine line : ordered) {
+            reservations.add(holdWithinTransaction(line.productId(), line.quantity(),
+                    command.caller(), command.idempotencyKey()));
+        }
+        return new ReservationBatchDetails(reservations);
+    }
+
+    private ReservationDetails holdWithinTransaction(Long productId, int quantity,
+                                                      String caller, String idempotencyKey) {
+        Optional<Reservation> replay = reservationStore.findByCallerKeyAndProduct(
+                caller.trim(), idempotencyKey.trim(), productId);
         if (replay.isPresent()) {
-            return replay(command, replay.orElseThrow());
+            return replay(replay.orElseThrow(), caller, productId, quantity);
         }
 
-        Product product = loadForUpdate(command.productId());
-
-        // Requests with the same key and SKU serialize on the balance row. Recheck
-        // after the lock so the second request observes the first committed result.
-        replay = reservationStore.findByCallerAndKey(
-                command.caller().trim(), command.idempotencyKey().trim());
+        Product product = loadForUpdate(productId);
+        replay = reservationStore.findByCallerKeyAndProduct(
+                caller.trim(), idempotencyKey.trim(), productId);
         if (replay.isPresent()) {
-            return replay(command, replay.orElseThrow());
+            return replay(replay.orElseThrow(), caller, productId, quantity);
         }
 
-        Product held = product.hold(command.quantity());
+        Product held = product.hold(quantity);
         Instant now = clock.instant();
         Reservation reservation = Reservation.hold(
-                UUID.randomUUID(), command.caller(), command.idempotencyKey(),
-                command.productId(), command.quantity(), now, ttl);
-
+                UUID.randomUUID(), caller, idempotencyKey, productId, quantity, now, ttl);
         saveProductPort.updateBalance(held);
         Reservation saved = reservationStore.save(reservation);
         return new ReservationDetails(saved, held);
@@ -130,9 +153,9 @@ public class ReservationLifecycleService implements ReservationUseCase {
         reservationStore.save(expired);
     }
 
-    private ReservationDetails replay(HoldReservationCommand command,
-                                      Reservation existing) {
-        if (!existing.matches(command.caller(), command.productId(), command.quantity())) {
+    private ReservationDetails replay(Reservation existing, String caller, Long productId,
+                                      int quantity) {
+        if (!existing.matches(caller, productId, quantity)) {
             throw new IdempotencyConflictException(
                     "Idempotency-Key đã được dùng với payload khác");
         }
@@ -161,6 +184,28 @@ public class ReservationLifecycleService implements ReservationUseCase {
         }
         if (command.quantity() <= 0) {
             throw new IllegalArgumentException("quantity phải > 0");
+        }
+        if (command.caller() == null || command.caller().isBlank()
+                || command.caller().length() > 64) {
+            throw new IllegalArgumentException("caller phải có 1..64 ký tự");
+        }
+        if (command.idempotencyKey() == null || command.idempotencyKey().isBlank()
+                || command.idempotencyKey().length() > 128) {
+            throw new IllegalArgumentException("Idempotency-Key phải có 1..128 ký tự");
+        }
+    }
+
+    private static void validateBatch(HoldReservationBatchCommand command) {
+        if (command == null || command.lines() == null || command.lines().isEmpty()) {
+            throw new IllegalArgumentException("lines phải có ít nhất một sản phẩm");
+        }
+        if (command.lines().stream().anyMatch(line -> line == null
+                || line.productId() == null || line.quantity() <= 0)) {
+            throw new IllegalArgumentException("mỗi line phải có productId và quantity > 0");
+        }
+        if (new HashSet<>(command.lines().stream().map(HoldReservationLine::productId).toList())
+                .size() != command.lines().size()) {
+            throw new IllegalArgumentException("một order không được lặp productId");
         }
         if (command.caller() == null || command.caller().isBlank()
                 || command.caller().length() > 64) {
