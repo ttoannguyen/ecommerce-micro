@@ -1,4 +1,3 @@
--- Separate physical inventory from temporary allocations.
 ALTER TABLE product RENAME COLUMN stock TO on_hand;
 ALTER TABLE product ADD COLUMN reserved INTEGER DEFAULT 0 NOT NULL;
 
@@ -7,8 +6,6 @@ ALTER TABLE product ADD CONSTRAINT ck_product_on_hand_nonnegative
 ALTER TABLE product ADD CONSTRAINT ck_product_reserved_valid
     CHECK (reserved >= 0 AND reserved <= on_hand);
 
--- Milestone 1 supports one SKU per reservation. The aggregate and API own the
--- lifecycle now; Milestone 3 can normalize lines when atomic multi-SKU holds arrive.
 CREATE TABLE reservation (
     id              UUID PRIMARY KEY,
     caller          VARCHAR(64)  NOT NULL,
@@ -20,7 +17,6 @@ CREATE TABLE reservation (
     expires_at      TIMESTAMP(6) WITH TIME ZONE NOT NULL,
     updated_at      TIMESTAMP(6) WITH TIME ZONE NOT NULL,
     version         BIGINT       NOT NULL,
-
     CONSTRAINT uq_reservation_caller_key UNIQUE (caller, idempotency_key),
     CONSTRAINT ck_reservation_quantity CHECK (quantity > 0),
     CONSTRAINT ck_reservation_status

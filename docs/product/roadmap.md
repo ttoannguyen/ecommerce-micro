@@ -49,18 +49,21 @@ khóa reservation và idempotent, expiry worker dùng server Clock, Product tác
 on-hand/reserved/available, Order lưu reservation ID và create order cũng
 idempotent. Reconciliation đối chiếu cả ledger/on-hand và HELD/reserved.
 
-## Milestone 2 — Integration evidence
+## Milestone 2 — Integration evidence (completed)
 
-- Testcontainers PostgreSQL cho persistence và concurrency.
-- WireMock hoặc MockWebServer cho OpenFeign.
-- Application test cho saga và compensation.
-- Contract test giữa Order và Inventory.
-- End-to-end smoke test bằng Docker Compose.
+Implementation plan: [Integration readiness](../implementation-plans/milestone-2-integration-readiness.md).
 
-Phải kiểm tra timeout trước/sau commit, compensation failure, idempotency replay,
-concurrent expiry và PostgreSQL locking.
+- Testcontainers PostgreSQL cho hai database độc lập.
+- Hai Spring application chạy đồng thời trong integration test.
+- OpenFeign order → product qua HTTP thật.
+- Idempotency replay, conflict và insufficient stock xuyên service.
+- Flyway migration được tách location theo service để tránh collision khi test chung classpath.
+- CI chạy integration path cùng root verify.
 
-Hoàn thành khi CI chạy được integration path thật mà không cần test tay.
+Timeout trước/sau commit và compensation failure vẫn là scenario mở rộng của
+Milestone 5; Milestone 2 đã chứng minh database, HTTP boundary và các path cơ bản.
+
+Hoàn thành: CI chạy được integration path thật mà không cần test tay.
 
 ## Milestone 3 — Order lifecycle
 

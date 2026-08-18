@@ -3,14 +3,14 @@
 - Updated: 2026-08-18
 - Branch reviewed: main
 - Scope: root build, reservation lifecycle, order-service, product-service,
-  Docker Compose và test hiện có
+  Docker Compose và integration test hiện có
 
 ## Tóm tắt
 
 Dự án đã có reservation identity, TTL, idempotency và stock ledger. Hold không
 còn bị mô hình như xuất kho vật lý: Product tách on-hand, reserved và available;
-Order lưu reference tới reservation. Khoảng trống lớn nhất tiếp theo là evidence
-trên PostgreSQL/OpenFeign thật và các failure path xuyên service.
+Order lưu reference tới reservation. Milestone 2 đã bổ sung evidence trên
+PostgreSQL/OpenFeign thật; khoảng trống tiếp theo là các failure path nâng cao.
 
 ## Kiến trúc đang chạy
 
@@ -69,17 +69,19 @@ orderdb                             productdb
 - Root Maven reactor chạy build và test cho cả hai service bằng `./mvnw -B verify`.
 - GitHub Actions quality workflow được cấu hình để chạy root verify, kiểm tra diff/Compose và build hai image.
 - H2 profile cho chạy local không cần PostgreSQL.
+- Module `integration-tests` dùng Testcontainers 2.0.5, PostgreSQL 16 và chạy hai
+  application context với port động.
+- Integration test chứng minh Flyway PostgreSQL, reservation replay, order replay,
+  idempotency conflict và insufficient stock qua OpenFeign.
 - OpenAPI/Swagger và Actuator health/info.
 
 ## Khoảng trống mức P1
 
-- Test quan trọng dùng H2, chưa chứng minh PostgreSQL locking/isolation.
-- Không test đường dây OpenFeign thật.
+- Chưa có stress test PostgreSQL locking/isolation ở quy mô lớn.
 - Saga orchestration có unit test, nhưng chưa có integration test cho timeout
   trước/sau commit, compensation failure và ambiguous response.
 - Order chỉ hỗ trợ một sản phẩm.
 - API danh sách chưa phân trang.
-- Chưa có PostgreSQL/Testcontainers integration path trong CI; phần này thuộc Milestone 2.
 - Expiry worker dùng row lock an toàn nhưng chưa dùng PostgreSQL `SKIP LOCKED` để
   chia batch hiệu quả dưới nhiều instance.
 
@@ -100,7 +102,7 @@ orderdb                             productdb
 
 ## Quyết định tiếp theo
 
-Milestone tiếp theo là integration evidence: Testcontainers PostgreSQL,
-WireMock/MockWebServer, contract test và Docker Compose smoke test tự động. Không
-thêm Kafka/Gateway trước khi các failure path của reservation được chứng minh.
+Milestone tiếp theo là realistic order lifecycle: nhiều line, state machine và
+multi-SKU reservation. Không thêm Kafka/Gateway trước khi các failure path của
+reservation được chứng minh.
 Xem [roadmap](roadmap.md).
